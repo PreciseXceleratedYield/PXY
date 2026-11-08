@@ -119,7 +119,7 @@ def _assign_cycle_ids(orders_df):
 
     result = orders_df.copy()
     result["Cycle_ID"] = pd.Series(cycle_ids, dtype="Int64")
-        return result
+    return result
 
 
 def dump_livpos_to_json(open_positions):
