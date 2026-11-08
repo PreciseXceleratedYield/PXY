@@ -126,6 +126,114 @@ def _read_nifty_futures_price():
     return price
 
 
+def _blend_stale_yahoo_futures_momentum(df, interval, max_age_seconds):
+    """Extend stale Yahoo 1m candles using 50% of fresh futures movement.
+
+    Never substitute a raw futures level for an index level. If a trustworthy
+    overlapping futures anchor is unavailable, leave the original data intact.
+    """
+    if interval != "1m" or df.empty or len(df) < 2:
+        return df
+    now = pd.Timestamp.now(tz=TIMEZONE)
+    if now.weekday() >= 5 or not (pd.Timestamp("09:15").time() <= now.time() < pd.Timestamp("15:30").time()):
+        return df
+    last = pd.Timestamp(df.index[-1])
+    last = last.tz_localize("UTC") if last.tzinfo is None else last
+    last = last.tz_convert(TIMEZONE)
+    age = (now - last).total_seconds()
+    if age <= max_age_seconds or age < 0:
+        return df
+
+    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "exe", "run", "nftfut.json")
+    try:
+        with open(file_path, "r", encoding="utf-8") as handle:
+            records = json.load(handle)
+    except (OSError, ValueError):
+        return df
+    if not isinstance(records, list):
+        return df
+
+    # An explicit failed latest quote must not be bypassed by older valid records.
+    if not records or not isinstance(records[-1], dict):
+        return df
+    try:
+        last_feed_price = float(records[-1].get("price"))
+        if not math.isfinite(last_feed_price) or last_feed_price <= 0:
+            return df
+    except (ValueError, TypeError, OverflowError):
+        return df
+
+    quotes = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        try:
+            stamp = pd.Timestamp(record["timestamp"])
+            price = float(record["price"])
+            if stamp.tzinfo is None or not math.isfinite(price) or price <= 0:
+                continue
+            quotes.append((stamp.tz_convert(TIMEZONE), price))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+    quotes.sort(key=lambda item: item[0])
+    if not quotes or not (0 <= (now - quotes[-1][0]).total_seconds() <= SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS):
+        return df
+
+    # Yahoo timestamps are candle starts; anchor at the end of its last candle.
+    anchor_time = last + pd.Timedelta(minutes=1)
+    anchors = [(t, p) for t, p in quotes if abs((t - anchor_time).total_seconds()) <= 60]
+    if not anchors:
+        return df
+    anchor_t, anchor_price = min(anchors, key=lambda item: abs((item[0] - anchor_time).total_seconds()))
+    try:
+        index_close = float(df["Close"].iloc[-1])
+    except (ValueError, TypeError):
+        return df
+    if not math.isfinite(index_close) or index_close <= 0:
+        return df
+    # Use half of each futures move, never the absolute futures price/premium.
+    # Require continuous minute coverage: never manufacture missing price moves.
+    by_minute = {}
+    for stamp, price in quotes:
+        if stamp <= anchor_t or stamp > now:
+            continue
+        bucket = stamp.floor("min")
+        if bucket <= last:
+            continue
+        by_minute.setdefault(bucket, []).append(price)
+    if not by_minute:
+        return df
+    extended = df.copy()
+    previous_close = index_close
+    previous_futures_close = anchor_price
+    minute = last + pd.Timedelta(minutes=1)
+    latest_minute = now.floor("min")
+    while minute <= latest_minute:
+        values = by_minute.get(minute)
+        if not values:
+            break
+        close = previous_close + 0.5 * (values[-1] - previous_futures_close)
+        blended_values = [previous_close + 0.5 * (value - previous_futures_close) for value in values]
+        if min(blended_values) <= 0 or close <= 0:
+            break
+        extended.loc[minute, ["Open", "High", "Low", "Close"]] = [
+            previous_close, max(previous_close, *blended_values),
+            min(previous_close, *blended_values), close,
+        ]
+        if "Volume" in extended.columns:
+            extended.loc[minute, "Volume"] = 0.0
+        previous_close = close
+        previous_futures_close = values[-1]
+        minute += pd.Timedelta(minutes=1)
+    if len(extended) == len(df):
+        return df
+    extended.attrs.update(df.attrs)
+    extended.attrs["futures_momentum_blend"] = True
+    extended.attrs["yahoo_last_timestamp"] = last.isoformat()
+    return extended
+
+
 def _fetch_yf_data_production(
     period=None,
     interval=SYSDTAFPXY_DEFAULT_INTERVAL,
@@ -244,9 +352,10 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # Futures never alter Yahoo OHLC or the signals calculated from it.
-    # The existing futures-only fallback above remains unchanged.
+    # Preserve Yahoo history, adding half of fresh futures momentum only when
+    # Yahoo 1m candles are delayed and a continuous, timestamped bridge exists.
     processed_df = transform_market_data(df)
+    processed_df = _blend_stale_yahoo_futures_momentum(processed_df, interval, 120)
 
     # Publish the two actual quotes already read above; never infer either
     # from transformed candles or perform an extra market-data request.
