@@ -73,7 +73,12 @@ def get_all_data():
             index_price = None
     except (TypeError, ValueError, OverflowError):
         index_price = None
-    final_price = futures_price if futures_price is not None else index_price
+    # Blend the current price when both quotes are valid; keep existing
+    # Yahoo candle history / indicator calculations untouched.
+    if futures_price is not None and index_price is not None:
+        final_price = (futures_price + index_price) / 2.0
+    else:
+        final_price = futures_price if futures_price is not None else index_price
 
     # Display SMA50 when trading filter is NONE; otherwise show the selected filter.
     # This display fallback does not enable an entry filter.
