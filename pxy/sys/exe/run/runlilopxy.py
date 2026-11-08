@@ -119,6 +119,7 @@ def _assign_book_ids(orders_df):
 
     result = orders_df.copy()
     result["Book_ID"] = pd.Series(book_ids, dtype="Int64")
+    result["Cycle_ID"] = result["Book_ID"]  # Additive migration alias
     return result
 
 
@@ -479,6 +480,7 @@ def _process_lilo_orders_production(
                         "Symbol": symbol, 
                         "Qty": mqty, 
                         "Book_ID": b.get("Book_ID"),
+                        "Cycle_ID": b.get("Cycle_ID", b.get("Book_ID")),
                         "Tag": b["tag"], 
                         "tok": token_id, 
                         "Buy_Time": b["dt"], 
@@ -501,6 +503,7 @@ def _process_lilo_orders_production(
                         "Symbol": symbol, 
                         "Qty": b["qty"], 
                         "Book_ID": b.get("Book_ID"),
+                        "Cycle_ID": b.get("Cycle_ID", b.get("Book_ID")),
                         "tok": token_id, 
                         "tag": b["tag"], 
                         "Buy_Time": b["dt"], 
