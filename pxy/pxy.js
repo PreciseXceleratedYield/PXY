@@ -22,7 +22,13 @@ const WEB_STATIC_ASSETS = new Set([
     '/pxy-theme.js',
     '/mbl/manifest.json',
     '/mbl/sw.js',
-    '/mbl/icon.svg'
+    '/mbl/icon.svg',
+    '/mbl/favicon.ico',
+    '/mbl/favicon-32.png',
+    '/mbl/favicon-48.png',
+    '/mbl/apple-touch-icon.png',
+    '/mbl/icon-192.png',
+    '/mbl/icon-512.png'
 ]);
 
 /* ========================= GLOBAL ERROR HANDLING ========================= */
