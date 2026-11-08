@@ -294,7 +294,6 @@ def _tick(client, open_df, closed_df, exit_signal=None):
                 booked_profit += snapshot["realized_pnl"]
                 closed_cycle_count += 1
                 snapshot["cycle_id"] = closed_cycle_count
-                snapshot["cycle_id"] = closed_cycle_count
                 closed_cycles.append(snapshot)
                 last_closed_snapshot = snapshot
                 last_closed_cycle_id = cycle_id
