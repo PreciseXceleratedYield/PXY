@@ -1648,8 +1648,10 @@ async function loadRisk(){
     try{riskData=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     const peak=Math.round(riskData.session_peak_pnl??0);
     const net=Math.round(riskData.current_net_pnl??0);
-    const floor=Math.round(riskData.active_exit_line??0);
-    const target=Math.round(riskData.active_target_line??0);
+    // No active book: show zero thresholds without altering backend risk controls.
+    const hasActiveBook=riskData.active_book_id!=null;
+    const floor=hasActiveBook?Math.round(riskData.active_exit_line??0):0;
+    const target=hasActiveBook?Math.round(riskData.active_target_line??0):0;
     $('rskTarget').textContent='₹'+target;
     $('rskNet').textContent='₹'+floor;
     $('rskNet').className='rsk-val bear';
