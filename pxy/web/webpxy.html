@@ -1643,25 +1643,47 @@ async function loadTrades(){
 }
 
 /* ── RISK BAR ── */
-let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-1000,active_target_line:1000,pnl_offset:0,booked_profit:0,closed_book_count:0,last_closed_snapshot:null,updated_timestamp:''};
+let riskData=null;
 async function loadRisk(){
-    try{riskData=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
-    const peak=Math.round(riskData.session_peak_pnl??0);
-    const net=Math.round(riskData.current_net_pnl??0);
-    const floor=Math.round(riskData.active_exit_line??-1000);
-    const target=Math.round(riskData.active_target_line??1000);
-    $('rskTarget').textContent='₹'+target;
-    $('rskNet').textContent='₹'+floor;
+    try{
+        const response=await fetch('/api/web-data/webrinkopxy?_='+Date.now(),{cache:'no-store'});
+        if(!response.ok)throw new Error('Risk ledger unavailable');
+        const data=await response.json();
+        const validNumber=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v));
+        // Ledger timestamp is written in IST without a timezone offset.
+        const timestamp=typeof data.updated_timestamp==='string'
+            ? Date.parse(data.updated_timestamp.trim().replace(' ','T')+'+05:30') : NaN;
+        const fresh=Number.isFinite(timestamp)&&Date.now()-timestamp>=-60000
+            &&Date.now()-timestamp<=120000;
+        if(!fresh||!['session_peak_pnl','current_net_pnl','active_exit_line','active_target_line']
+            .every(k=>validNumber(data[k])))throw new Error('Missing or stale RiskBar data');
+        riskData=data;
+    }catch{
+        riskData=null;
+    }
+    const valid=!!riskData;
+    const peak=valid?Math.round(Number(riskData.session_peak_pnl)):null;
+    const net=valid?Math.round(Number(riskData.current_net_pnl)):null;
+    const floor=valid?Math.round(Number(riskData.active_exit_line)):null;
+    const target=valid?Math.round(Number(riskData.active_target_line)):null;
+    $('rskTarget').textContent=valid?'₹'+target:'—';
+    $('rskNet').textContent=valid?'₹'+floor:'—';
     $('rskNet').className='rsk-val bear';
-    drawRiskCandle(floor,net,peak);
+    if(valid)drawRiskCandle(floor,net,peak);
+    else{
+        const canvas=$('rskCanvas');
+        if(canvas)canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+        $('riskBar').style.boxShadow='';
+    }
     renderRiskInfo();
     const clkEl=$('clk');
     const clientName=(clkEl&&clkEl.textContent&&clkEl.textContent!=='—')?clkEl.textContent:'PXY®';
-    document.title='₹'+fmt(net)+' · '+clientName;
+    document.title=(valid?'₹'+fmt(net):'—')+' · '+clientName;
 }
 /* click candle -> highlight + info (all values read from webrinkopxy.json) */
 function renderRiskInfo(){
     const el=$('rskInfo');if(!el)return;
+    if(!riskData){el.textContent='Risk data unavailable';return;}
     const d=riskData,f=v=>'₹'+(v>=0?'':'-')+Math.abs(Math.round(v||0));
     const cls=v=>(v>=0?'bull':'bear');
     const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1691,6 +1713,7 @@ function renderRiskInfo(){
 })();
 let lastFloor=-3000,lastNet=0,lastPeak=10;
 function drawRiskCandle(floor,net,peak){
+    if(!riskData)return;
     lastFloor=floor;lastNet=net;lastPeak=peak;
     const canvas=$('rskCanvas');if(!canvas)return;
     const ctx=canvas.getContext('2d'),dpr=window.devicePixelRatio||1;
