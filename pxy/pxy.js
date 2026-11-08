@@ -15,7 +15,11 @@ const app = express();
 const server = http.createServer(app); 
 const wss = new WebSocket.Server({ server }); 
 
-const PORT = process.env.PORT || 80; 
+const PORT = Number(process.env.PORT || 80);
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
+    console.error('[SERVER ERROR] PORT must be an integer between 1 and 65535.');
+    process.exit(1);
+} 
 const WEB_DIR = path.resolve(__dirname, 'web');
 const WEB_STATIC_ASSETS = new Set([
     '/pxy-theme.css',
