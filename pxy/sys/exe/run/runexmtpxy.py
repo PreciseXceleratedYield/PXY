@@ -230,6 +230,7 @@ def cycle_risk_metrics(
         "investment_target": investment_target,
         "active_count": book_trade_count,
         "book_trade_count": book_trade_count,
+        "cycle_trade_count": book_trade_count,
         "ce_qty": ce_qty,
         "pe_qty": pe_qty,
         "ce_investment": ce_investment,
@@ -241,7 +242,7 @@ def cycle_risk_metrics(
     }
 
 
-def cycle_closed_book_snapshot(closed_df, cycle_tags, cycle_started_at):
+def cycle_closed_snapshot(closed_df, cycle_tags, cycle_started_at):
     if closed_df is None or closed_df.empty:
         return None
     rows = closed_df.copy()
@@ -328,3 +329,7 @@ def compute_stop_conditions(current_game_pnl, historical_peak, active_count=2):
     stop_breached = current_game_pnl <= unified_stop
     target_breached = winners_peak_brick >= target_ceiling(active_count)
     return winners_peak_brick, unified_stop, stop_breached, target_breached
+
+
+# Compatibility for integrations importing the historical function name.
+cycle_closed_book_snapshot = cycle_closed_snapshot
