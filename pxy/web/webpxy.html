@@ -1541,27 +1541,27 @@ async function loadTrades(){
             .sort((a,b)=>(Date.parse(b.cycle_started_at||'')||0)
                 -(Date.parse(a.cycle_started_at||'')||0))[0];
     };
-    const books=new Map();
+    const cycles=new Map();
     data.forEach((t,index)=>{
         const riskCycle=riskCycleForTrade(t);
-        const hasRiskBook=riskCycle!==undefined;
+        const hasRiskCycle=riskCycle!==undefined;
         const cycleId=t.Cycle_ID;
         const hasCycleId=cycleId!==null&&cycleId!==undefined&&cycleId!=='';
-        const id=hasRiskBook?String(riskCycle.id):hasCycleId?String(cycleId):'';
-        const key=hasRiskBook?'risk-book-'+id:hasCycleId?'book-'+id:'unassigned-'+index;
-        if(!books.has(key))books.set(key,{
-            key,id,legacy:!hasRiskBook&&!hasCycleId,risk:hasRiskBook,
+        const id=hasRiskCycle?String(riskCycle.id):hasCycleId?String(cycleId):'';
+        const key=hasRiskCycle?'risk-cycle-'+id:hasCycleId?'cycle-'+id:'unassigned-'+index;
+        if(!cycles.has(key))cycles.set(key,{
+            key,id,legacy:!hasRiskCycle&&!hasCycleId,risk:hasRiskCycle,
             trades:[],pnl:0,open:false,sortTime:0,firstTag:String(t.Tag||'')
         });
-        const book=books.get(key);
+        const book=cycles.get(key);
         book.trades.push(t);
         book.pnl+=Number(t.PNL)||0;
         book.open=book.open||String(t.Status||'CLOSED').toUpperCase()==='OPEN';
         const time=Date.parse(t.Exit_Time==='OPEN'?t.Buy_Time:t.Exit_Time||t.Buy_Time||'');
         if(Number.isFinite(time))book.sortTime=Math.max(book.sortTime,time);
     });
-    const bookList=[...books.values()];
-    bookList.sort((a,b)=>{
+    const cycleList=[...cycles.values()];
+    cycleList.sort((a,b)=>{
         if(a.open!==b.open)return a.open?-1:1;
         let v;
         if(trCol==='pnl')v=a.pnl-b.pnl;
@@ -1572,7 +1572,7 @@ async function loadTrades(){
         }
         return trAsc?v:-v;
     });
-    bookList.forEach(book=>{
+    cycleList.forEach(book=>{
         const pnl=book.pnl,pb=pnl>=0;
         const name=book.legacy?'Unassigned trade':'Cycle '+book.id;
         const details=document.createElement('div');
@@ -1650,9 +1650,9 @@ async function loadRisk(){
     const peak=Math.round(riskData.session_peak_pnl??0);
     const net=Math.round(riskData.current_net_pnl??0);
     // No active cycle: show zero thresholds without altering backend risk controls.
-    const hasActiveBook=(riskData.active_cycle_id??riskData.active_cycle_id)!=null;
-    const floor=hasActiveBook?Math.round(riskData.active_exit_line??0):0;
-    const target=hasActiveBook?Math.round(riskData.active_target_line??0):0;
+    const hasActiveCycle=riskData.active_cycle_id!=null;
+    const floor=hasActiveCycle?Math.round(riskData.active_exit_line??0):0;
+    const target=hasActiveCycle?Math.round(riskData.active_target_line??0):0;
     $('rskTarget').textContent='₹'+target;
     $('rskNet').textContent='₹'+floor;
     $('rskNet').className='rsk-val bear';
