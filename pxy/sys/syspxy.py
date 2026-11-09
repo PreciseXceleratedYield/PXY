@@ -63,7 +63,7 @@ def get_all_data():
 
     # -------- PRICE LOGIC (DISPLAY/EXECUTION SNAPSHOT ONLY) --------
     # Reuse the existing timestamp-validated Kotak Futures feed; no new API call.
-    # If unavailable, use the NIFTY index price only when Yahoo data exists.
+    # Average Futures and NIFTY index when both exist; otherwise use the available source.
     # This changes only the published price, never the OHLC or indicators.
     futures_price = _read_nifty_futures_price(max_age_seconds=30 * 60)
     index_price = core.get("price") if core.get("market_data_available", False) else None
@@ -73,8 +73,11 @@ def get_all_data():
             index_price = None
     except (TypeError, ValueError, OverflowError):
         index_price = None
-    # Futures are preferred for up to 30 minutes; Yahoo is fallback only.
-    final_price = futures_price if futures_price is not None else index_price
+    # Blend both available prices; otherwise use whichever valid source remains.
+    if futures_price is not None and index_price is not None:
+        final_price = (futures_price + index_price) / 2.0
+    else:
+        final_price = futures_price if futures_price is not None else index_price
 
     # Display SMA50 when trading filter is NONE; otherwise show the selected filter.
     # This display fallback does not enable an entry filter.
