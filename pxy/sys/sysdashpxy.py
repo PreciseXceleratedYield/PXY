@@ -170,7 +170,9 @@ def print_dashboard(data):
         return
 
     # 1. CANDLE VISUAL STREAM
-    print(data["candle_visual"])
+    # Terminal-only display substitution; preserve ANSI color codes and shared web data.
+    import re
+    print(re.sub(r"\x1b\[[0-9;]*m|1", lambda m: "+" if m.group() == "1" else m.group(), data["candle_visual"]))
 
     # 2. FLIP/TREND DATA LINE
     sig, pst = data["hkin_signal"], data["hkin_past_depth"]
