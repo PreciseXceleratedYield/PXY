@@ -20,10 +20,10 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     TSMA blends TSMA close with real close, then averages that blend with the prior final synthetic close.
     HKIN applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA", "STRW"}
+    valid_modes = {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA", "STRW", "STMA"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW0, RAW2, HKIN, RAW4, HYPR, TSMA, or STRW."
+            "DTHA mode must be RAW0, RAW2, HKIN, RAW4, HYPR, TSMA, STRW, or STMA."
         )
 
     if df is None or df.empty:
@@ -39,7 +39,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
-    if mode in {"RAW0", "STRW"}:
+    if mode in {"RAW0", "STRW", "STMA"}:
         return out
 
     if mode == "RAW2":
@@ -105,6 +105,39 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     out["Low"] = ha_low
     out["Close"] = ha_close
     return out
+
+
+def get_stma_signals(df, include_running=None):
+    """Continuous IN/OUT classification using RAW OHLC, ST(1, 0.5), TSMA(7)."""
+    from sysstrnpxy import _compute_single_st
+    from systsmpxy import calculate_tsma
+
+    neutral = ("NONE", "SIDE")
+    if df is None or df.empty:
+        return neutral
+    required = ("Open", "High", "Low", "Close")
+    if any(name not in df.columns for name in required):
+        return neutral
+    if include_running is None:
+        include_running = SYSDTHAPXY_INCLUDE_RUNNING_CANDLE == "YES"
+    candles = df if include_running else df.iloc[:-1]
+    if len(candles) < SYSSMAPXY_TSMA_PERIOD:
+        return neutral
+    raw = candles.loc[:, list(required)].apply(pd.to_numeric, errors="coerce")
+    if not np.isfinite(raw.to_numpy(dtype=float)).all():
+        return neutral
+    st, _ = _compute_single_st(raw, period=1, factor=0.5)
+    tsma = calculate_tsma(raw["Close"], period=SYSSMAPXY_TSMA_PERIOD)
+    price = float(raw["Close"].iloc[-1])
+    st_value = float(st[-1])
+    tsma_value = float(tsma.iloc[-1])
+    if not np.isfinite([price, st_value, tsma_value]).all():
+        return neutral
+    if price > st_value and price > tsma_value:
+        return ("BUY", "BULL")
+    if price < st_value and price < tsma_value:
+        return ("SELL", "BEAR")
+    return neutral
 
 
 def get_strw_signals(df, include_running=None):
