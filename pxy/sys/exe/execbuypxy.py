@@ -131,7 +131,7 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     price  -> price supplied in remaining_df
 
     ATM / ITM -> 0
-    OTM       -> full strike-to-spot distance minus 50 per held lot, rounded to 100
+    OTM       -> half the strike-to-spot distance, rounded to 100
     """
 
     if remaining_df is None or remaining_df.empty:
@@ -195,17 +195,10 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     if option_type == "PE" and strike > spot:
         return 0
 
-    # Count actual held lots, not DataFrame rows (averaged lots can share a row).
-    quantities = pd.to_numeric(remaining_df["qty"], errors="coerce")
-    if quantities.isna().any() or (quantities <= 0).any():
-        return None
-    total_qty = float(quantities.sum())
-    if total_qty % SYSCNFGPXY_NIFTY_LOT_SIZE != 0:
-        return None
-    held_count = int(total_qty / SYSCNFGPXY_NIFTY_LOT_SIZE)
-    difference = max(0.0, abs(strike - spot) - 50.0 * held_count)
+    # Counter-buy offset: half the distance from active strike to spot.
+    difference = abs(strike - spot) / 2.0
 
-    # Counter-buy offsets round to the nearest 100 (ending in 00).
+    # Preserve the existing strike-offset rounding to the nearest 100.
     offset_step = 100
     return int(
         ((difference + offset_step / 2) // offset_step) * offset_step
