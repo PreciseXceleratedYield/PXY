@@ -5,6 +5,7 @@ import pandas as pd
 from syscnfgpxy import (
     SYSOUTPXY_SIGNAL_MODE,
     SYSDTHAPXY_CANDLE_MODE,
+    SYSDTHAPXY_STMA_ENABLED,
 )
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states, get_strw_signals, get_stma_signals
@@ -32,7 +33,7 @@ def get_signal(df=None):
             states = get_stmt_states(df)
             return str(states.iloc[-1]) if not states.empty else "NONE"
 
-        if SYSOUTPXY_SIGNAL_MODE == "DTHA" and SYSDTHAPXY_CANDLE_MODE == "STMA":
+        if SYSOUTPXY_SIGNAL_MODE == "DTHA" and SYSDTHAPXY_STMA_ENABLED:
             return get_stma_signals(df)[1]
 
         if SYSOUTPXY_SIGNAL_MODE == "DTHA" and SYSDTHAPXY_CANDLE_MODE == "STRW":
