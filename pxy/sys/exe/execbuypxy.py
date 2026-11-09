@@ -15,7 +15,7 @@
 import os
 import json
 import time
-from datetime import datetime
+from datetime import datetime, time as dt_time
 import pandas as pd
 
 from colorama import Fore, Style
@@ -195,8 +195,14 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     if option_type == "PE" and strike > spot:
         return 0
 
-    # Counter-buy offset: half the distance from active strike to spot.
+    # Counter-buy baseline: half the distance from active strike to spot.
     difference = abs(strike - spot) / 2.0
+
+    # During the morning override, halve the counter-buy offset once more.
+    # Regular entry strike selection is unaffected.
+    now_time = datetime.now(SYSCNFGPXY_TIMEZONE).time()
+    if dt_time(9, 16) <= now_time < dt_time(9, 30):
+        difference /= 2.0
 
     # Preserve the existing strike-offset rounding to the nearest 100.
     offset_step = 100
