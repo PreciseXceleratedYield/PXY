@@ -1,5 +1,4 @@
 #sysexitpxy.py
-import os
 import pandas as pd
 from colorama import Fore, Style, init
 
@@ -10,25 +9,12 @@ init(autoreset=True)
 TOTAL_WIDTH = 42
 
 def load_cached_data() -> pd.DataFrame:
-    """
-    Safely reads the already-dumped JSON matrix from your background engine,
-    completely bypassing yfinance disk-caching bottlenecks.
-    """
+    """Compatibility wrapper: fetch current production DTAF candles, not web cache."""
     try:
-        script_directory = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
-        parent_directory = os.path.dirname(script_directory)
-        
-        # Read the daily candle cache shared with the web charts.
-        json_path = os.path.join(parent_directory, "web", "webdaypxy.json")
-        
-        if not os.path.exists(json_path):
-            return None
-            
-        # Read the json file matching the 'split' orientation used by your engine
-        df = pd.read_json(json_path, orient='split')
-        return df
+        from sysdtafpxy import fetch_yf_data
+        return fetch_yf_data()
     except Exception as e:
-        print(f"{Fore.RED}Error reading cache matrix: {e}")
+        print(f"{Fore.RED}Error fetching DTAF market data: {e}")
         return None
 
 # -------------------- Direction logic --------------------
@@ -68,7 +54,7 @@ def detect_raw_direction(df: pd.DataFrame) -> tuple:
 
 # -------------------- Self-runnable test --------------------
 if __name__ == "__main__":
-    # FIX: Swapped out high-disk fetch_yf_data() for fast 2ms cache parsing
+    # Fetch live production DTAF candles instead of the web JSON cache
     df = load_cached_data()
     price, direction = detect_raw_direction(df)
 
