@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 
 from sysmktpxy import get_signals as get_market_signals
-from sysexitpxy import detect_raw_direction
+from sysdirpxy import detect_raw_direction
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_FRESH_ENTRY_START,
