@@ -373,7 +373,6 @@ def snapshot_report(title, state=None):
             lines.append(formatted)
     lines.extend(["━━━━━━━━━━━━━━━━━━━━━━━━", field("Status", status)])
     header = f"Hello {html.escape(socket.gethostname())}, {greeting}!\n\n{emoji} PXY — {title}"
-    message = header + "\n<pre>" + "\n".join(lines) + "</pre>"
     if title == "TOUCHDOWN":
         cycle_groups = {}
         for row in closed:
@@ -397,10 +396,15 @@ def snapshot_report(title, state=None):
             pct = (100 * cycle_pnl / capital) if capital is not None and capital > 0 else None
             suffix = f" ({pct:+.2f}%)" if pct is not None else ""
             summary.append(f"CYCLE #{html.escape(cycle_id)} PNL: {html.escape(money(cycle_pnl))}{suffix}")
+        suffix = f" ({daily_return:+.2f}%)" if daily_return is not None else ""
+        message = header + "\n<pre>" + field("Status", status) + "</pre>"
         if summary:
             message += "\n<pre>" + "\n".join(summary) + "</pre>"
-        suffix = f" ({daily_return:+.2f}%)" if daily_return is not None else ""
+        message += "\n━━━━━━━━━━━━━━━━━━━━━━━━"
         message += "\n<b>🏆 FINAL NET PNL: " + html.escape(money(net)) + suffix + "</b>"
+        message += "\n\n<pre>" + "\n".join(lines[:-2]) + "</pre>"
+    else:
+        message = header + "\n<pre>" + "\n".join(lines) + "</pre>"
     return message
 
 
