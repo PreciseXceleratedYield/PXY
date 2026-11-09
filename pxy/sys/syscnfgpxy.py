@@ -166,7 +166,9 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 # DTHA transforms candles consumed by IN/OUT; STMT evaluates the selected candles independent of confirmation mode.
 # ================================================================
 # Switch or algorithm selection for candle mode.
-SYSDTHAPXY_CANDLE_MODE = "STMA"
+SYSDTHAPXY_CANDLE_MODE = "HYPR"
+# Apply STMA signal classification on the selected DTHA candle source.
+SYSDTHAPXY_STMA_ENABLED = True
 if SYSDTHAPXY_CANDLE_MODE not in {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA", "STRW", "STMA"}:
     raise ValueError(
         "SYSDTHAPXY_CANDLE_MODE must be RAW0, RAW2, HKIN, RAW4, HYPR, TSMA, STRW, or STMA."
