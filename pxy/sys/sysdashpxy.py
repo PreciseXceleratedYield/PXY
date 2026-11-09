@@ -17,7 +17,7 @@ from syscnfgpxy import (
 )
 from sysdthapxy import get_pxy_data, get_signal_depth_analysis
 from syskatrpxy import calculate_atr, calculate_dynamic_k
-from sysexitpxy import detect_raw_direction
+from sysdirpxy import detect_raw_direction
 from sysictrpxy import calculate_indicators, get_indicator_signals
 from syspwerpxy import get_ce_pe_power
 from sysentrpxy import get_entry_signal
