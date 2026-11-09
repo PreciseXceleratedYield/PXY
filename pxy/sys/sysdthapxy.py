@@ -22,10 +22,10 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     TSMA blends TSMA close with real close, then averages that blend with the prior final synthetic close.
     HKIN applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA", "STRW"}
+    valid_modes = {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA", "STRW", "STMA"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW0, RAW2, HKIN, RAW4, HYPR, TSMA, or STRW."
+            "DTHA mode must be RAW0, RAW2, HKIN, RAW4, HYPR, TSMA, STRW, or STMA."
         )
 
     if df is None or df.empty:
@@ -41,7 +41,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
-    if mode in {"RAW0", "STRW"}:
+    if mode in {"RAW0", "STRW", "STMA"}:
         return out
 
     if mode == "RAW2":
