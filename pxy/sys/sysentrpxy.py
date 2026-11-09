@@ -50,15 +50,11 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     else:
         now_time = now
 
-    if df is None:
-        from sysdtafpxy import fetch_yf_data
-        df = fetch_yf_data()
-
     # Morning OC/2 direction override using the current DTAF snapshot.
     # Master liquidation, cooldown, and entry-time restrictions still take precedence.
     if ENTRY_START <= now_time < MORNING_OVERRIDE_END:
         try:
-            _, direction = get_morning_direction(df)
+            _, direction = get_morning_direction()
             direction = str(direction).upper().strip()
             entry_sig = {"UP": "BUY", "DOWN": "SELL"}.get(direction, "NONE")
             exit_sig = {"UP": "BULL", "DOWN": "BEAR"}.get(direction, "NONE")
@@ -67,6 +63,10 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
             entry_sig, exit_sig = "NONE", "NONE"
         print(f"⏱️ MORNING OVERRIDE | IN: {entry_sig} | OUT: {exit_sig}")
         return _apply_new_cycle_cutoff(entry_sig, exit_sig, now_time)
+
+    if df is None:
+        from sysdtafpxy import fetch_yf_data
+        df = fetch_yf_data()
 
     raw_entry, raw_exit = get_market_signals(df)
     raw_entry = str(raw_entry).upper().strip()
