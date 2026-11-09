@@ -372,11 +372,35 @@ def snapshot_report(title, state=None):
         if formatted is not None:
             lines.append(formatted)
     lines.extend(["━━━━━━━━━━━━━━━━━━━━━━━━", field("Status", status)])
-    header = f"Hello {html.escape(socket.gethostname())}, {greeting}!\\n\\n{emoji} PXY — {title}"
-    message = header + "\\n<pre>" + "\\n".join(lines) + "</pre>"
+    header = f"Hello {html.escape(socket.gethostname())}, {greeting}!\n\n{emoji} PXY — {title}"
+    message = header + "\n<pre>" + "\n".join(lines) + "</pre>"
     if title == "TOUCHDOWN":
+        cycle_groups = {}
+        for row in closed:
+            cycle_id = row.get("Cycle_ID")
+            if cycle_id is not None:
+                cycle_groups.setdefault(str(cycle_id), []).append(row)
+        summary = []
+        for cycle_id, rows in sorted(
+            cycle_groups.items(),
+            key=lambda pair: max(str(r.get("Exit_Time", "")) for r in pair[1]),
+        ):
+            all_rows = [r for r in trades if isinstance(r, dict)
+                        and str(r.get("Cycle_ID")) == cycle_id]
+            if len(all_rows) != len(rows):
+                continue
+            amounts = [safe_number(r.get("PNL")) for r in rows]
+            cycle_pnl = sum(amounts) if all(v is not None for v in amounts) else None
+            if cycle_pnl is None:
+                continue
+            capital = daily_peak_investment(rows)
+            pct = (100 * cycle_pnl / capital) if capital is not None and capital > 0 else None
+            suffix = f" ({pct:+.2f}%)" if pct is not None else ""
+            summary.append(f"CYCLE #{html.escape(cycle_id)} PNL: {html.escape(money(cycle_pnl))}{suffix}")
+        if summary:
+            message += "\n<pre>" + "\n".join(summary) + "</pre>"
         suffix = f" ({daily_return:+.2f}%)" if daily_return is not None else ""
-        message += "\\n<b>🏆 FINAL NET PNL: " + html.escape(money(net)) + suffix + "</b>"
+        message += "\n<b>🏆 FINAL NET PNL: " + html.escape(money(net)) + suffix + "</b>"
     return message
 
 
