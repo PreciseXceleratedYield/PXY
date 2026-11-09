@@ -7,6 +7,8 @@ from syscnfgpxy import (
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
     SYSDPTPXY_LAST_N,
     SYSSMAPXY_TSMA_PERIOD,
+    SYSDTSTPXY_ST1_PERIOD,
+    SYSDTSTPXY_ST1_FACTOR,
 )
 from syssmapxy import calculate_moving_average
 from sysdtafpxy import fetch_yf_data
@@ -167,6 +169,46 @@ def get_strw_signals(df, include_running=None):
     if st_direction == raw_direction:
         return ("NONE", out_signal)
     return ("BUY" if st_direction == "BULL" else "SELL", out_signal)
+
+
+def get_stma_signals(df, include_running=None):
+    """Hybrid ST + TSMA crossing: IN on a crossing, OUT by price side."""
+    from sysstrnpxy import _compute_single_st
+
+    neutral = ("NONE", "SIDE")
+    if df is None or df.empty:
+        return neutral
+    required = ("Open", "High", "Low", "Close")
+    if any(name not in df.columns for name in required):
+        return neutral
+    if include_running is None:
+        include_running = SYSDTHAPXY_INCLUDE_RUNNING_CANDLE == "YES"
+    candles = df if include_running else df.iloc[:-1]
+    if len(candles) < SYSSMAPXY_TSMA_PERIOD + 1:
+        return neutral
+    raw = candles.loc[:, list(required)].apply(pd.to_numeric, errors="coerce")
+    if not np.isfinite(raw.to_numpy(dtype=float)).all():
+        return neutral
+
+    st_line, _ = _compute_single_st(
+        raw, period=SYSDTSTPXY_ST1_PERIOD, factor=SYSDTSTPXY_ST1_FACTOR
+    )
+    tsma = calculate_moving_average(
+        raw["Close"], period=SYSSMAPXY_TSMA_PERIOD, variant="TSMA"
+    ).to_numpy(dtype=float)
+    hybrid = (np.asarray(st_line, dtype=float) + tsma) / 2.0
+    close = raw["Close"].to_numpy(dtype=float)
+    if not np.isfinite(hybrid[-2:]).all():
+        return neutral
+
+    prev_gap = close[-2] - hybrid[-2]
+    gap = close[-1] - hybrid[-1]
+    if gap > 0:
+        return ("BUY" if prev_gap <= 0 else "NONE", "BULL")
+    if gap < 0:
+        return ("SELL" if prev_gap >= 0 else "NONE", "BEAR")
+    return neutral
+
 
 def get_close_direction_series(closes):
     """Return each close's direction relative to the preceding close."""
