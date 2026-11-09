@@ -17,13 +17,13 @@ sysdtafpxy -> sysdthapxy -> indicators
                               sysmktpxy
                        market / trend filters
                                   |
-                              sysentrpxy <--- sysexitpxy
+                              sysentrpxy <--- sysdirpxy
                        time-based routing    morning direction
                                   |
                            execution pipeline
 
 Priority:
-- sysentrpxy uses sysexitpxy direction in its morning override window,
+- sysentrpxy uses sysdirpxy direction in its morning override window,
   regardless of configured IN/OUT modes or sysmktpxy trend filters.
 - Outside that window, sysentrpxy consumes sysmktpxy filtered signals.
 - Master liquidation and post-square-off cooldown gates take precedence.
