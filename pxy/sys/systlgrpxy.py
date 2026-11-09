@@ -435,7 +435,7 @@ def scan_cycles(state):
             field("Status", "COMPLETED"),
             "━━━━━━━━━━━━━━━━━━━━━━━━",
         ]
-        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>🏆 CYCLE NET PNL: " + html.escape(money(pnl)) + " (" + (f"{cycle_return:+.2f}%" if cycle_return is not None else "NA") + ")</b>"
+        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>🏆 CYCLE #" + html.escape(cycle) + " PNL: " + html.escape(money(pnl)) + (" (" + f"{cycle_return:+.2f}%" + ")" if cycle_return is not None else "") + "</b>"
         send(state, key, "CYCLE", message)
     state["cycle_initialized"] = True
     save(state)
