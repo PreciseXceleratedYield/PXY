@@ -4,6 +4,7 @@ import sys
 
 from sysmktpxy import get_signals as get_market_signals
 from sysdirpxy import detect_raw_direction
+from sysmrngpxy import get_morning_direction
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_FRESH_ENTRY_START,
@@ -53,11 +54,11 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         from sysdtafpxy import fetch_yf_data
         df = fetch_yf_data()
 
-    # Restore the 09:30 Mullu direction override using the current DTAF snapshot.
+    # Morning OC/2 direction override using the current DTAF snapshot.
     # Master liquidation, cooldown, and entry-time restrictions still take precedence.
     if ENTRY_START <= now_time < MORNING_OVERRIDE_END:
         try:
-            _, direction = detect_raw_direction(df)
+            _, direction = get_morning_direction(df)
             direction = str(direction).upper().strip()
             entry_sig = {"UP": "BUY", "DOWN": "SELL"}.get(direction, "NONE")
             exit_sig = {"UP": "BULL", "DOWN": "BEAR"}.get(direction, "NONE")
