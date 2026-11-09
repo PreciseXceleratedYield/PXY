@@ -108,7 +108,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
 
 def get_stma_signals(df, include_running=None):
-    """Continuous IN/OUT classification using RAW OHLC, ST(1, 0.5), TSMA(7)."""
+    """Continuous IN/OUT classification using selected DTHA OHLC, ST(1, 0.5), TSMA(7)."""
     from sysstrnpxy import _compute_single_st
     from systsmpxy import calculate_tsma
 
@@ -123,12 +123,13 @@ def get_stma_signals(df, include_running=None):
     candles = df if include_running else df.iloc[:-1]
     if len(candles) < SYSSMAPXY_TSMA_PERIOD:
         return neutral
-    raw = candles.loc[:, list(required)].apply(pd.to_numeric, errors="coerce")
-    if not np.isfinite(raw.to_numpy(dtype=float)).all():
+    transformed = transform_dtha_ohlc(candles)
+    source = transformed.loc[:, list(required)].apply(pd.to_numeric, errors="coerce")
+    if not np.isfinite(source.to_numpy(dtype=float)).all():
         return neutral
-    st, _ = _compute_single_st(raw, period=1, factor=0.5)
-    tsma = calculate_tsma(raw["Close"], period=SYSSMAPXY_TSMA_PERIOD)
-    price = float(raw["Close"].iloc[-1])
+    st, _ = _compute_single_st(source, period=1, factor=0.5)
+    tsma = calculate_tsma(source["Close"], period=SYSSMAPXY_TSMA_PERIOD)
+    price = float(source["Close"].iloc[-1])
     st_value = float(st[-1])
     tsma_value = float(tsma.iloc[-1])
     if not np.isfinite([price, st_value, tsma_value]).all():
