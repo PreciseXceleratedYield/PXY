@@ -211,7 +211,7 @@ def target_price(
             return round(entry_prc, 2)
 
         is_aligned = (
-            exit_signal in ("NONE", "SIDE")
+            exit_signal == "NONE"
             or (exit_signal == "BULL" and is_ce)
             or (exit_signal == "BEAR" and is_pe)
         )
