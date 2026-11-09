@@ -8,7 +8,7 @@ from syscnfgpxy import (
     SYSDTHAPXY_CANDLE_MODE,
 )
 from sysdtafpxy import fetch_yf_data
-from sysexitpxy import detect_raw_direction
+from sysdirpxy import detect_raw_direction
 from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states, get_strw_signals, get_stma_signals
 
 
