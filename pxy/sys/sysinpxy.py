@@ -6,6 +6,7 @@ from syscnfgpxy import (
     SYSINPXY_CONFIRM_MODE,
     SYSINPXY_SIGNAL_MODE,
     SYSDTHAPXY_CANDLE_MODE,
+    SYSDTHAPXY_STMA_ENABLED,
 )
 from sysdtafpxy import fetch_yf_data
 from sysexitpxy import detect_raw_direction
@@ -37,7 +38,7 @@ def get_signal(df=None):
                 return {"UP": "SELL", "DOWN": "BUY"}.get(raw_direction, "NONE")
             return "NONE"
 
-        if SYSINPXY_SIGNAL_MODE == "DTHA" and SYSDTHAPXY_CANDLE_MODE == "STMA":
+        if SYSINPXY_SIGNAL_MODE == "DTHA" and SYSDTHAPXY_STMA_ENABLED:
             return get_stma_signals(df)[0]
 
         if SYSINPXY_SIGNAL_MODE == "DTHA" and SYSDTHAPXY_CANDLE_MODE == "STRW":
