@@ -198,6 +198,13 @@ def engine_alive():
         return False
 
 
+def available_field(label, value):
+    """Hide unavailable fields but preserve numeric zero."""
+    if value is None or (isinstance(value, str) and value.strip().upper() in {"", "NA", "N/A", "NONE", "NULL"}):
+        return None
+    return field(label, value)
+
+
 def field(label, value):
     """Ten-character label, then space-colon-space; HTML-safe values."""
     return f"{label:<10}: {html.escape(str(value))}"
@@ -335,53 +342,42 @@ def snapshot_report(title, state=None):
               else title if title != "TAKEOFF" else "READY")
     greeting = "Good Evening" if title == "TOUCHDOWN" else "Good Afternoon" if title == "DESCENDING" else "Good Morning"
     emoji = {"TAKEOFF": "🚀", "AIRBORNE": "✈️", "DESCENDING": "🛬", "TOUCHDOWN": "🛬"}[title]
-    lines = [
-        f"Hello {html.escape(socket.gethostname())}, {greeting}! ",
-        "",
-        f"{emoji} PXY — {title}",
-        "━━━━━━━━━━━━━━━━━━━━━━━━",
-        field("Date", stamp.strftime("%d-%b-%Y")),
-        field("Engine", "RUNNING" if engine else "STOPPED"),
-        field("WebPXY", "RUNNING" if web else "STOPPED"),
-        field("Watchdog", "RUNNING" if watch else "STOPPED"),
-        field("Control", "RUNNING"),
-        field("Broker", "NA"),
-        field("Market", "CLOSED" if title == "TOUCHDOWN" else "NA"),
-        field("Uptime", uptime()),
-        field("Data Age", "NA"),
+    # One shared layout for all four scheduled reports; never fabricate values.
+    report_fields = [
+        ("Date", stamp.strftime("%d-%b-%Y")),
+        ("Engine", "RUNNING" if engine else "STOPPED"),
+        ("WebPXY", "RUNNING" if web else "STOPPED"),
+        ("Watchdog", "RUNNING" if watch else "STOPPED"),
+        ("Control", "RUNNING"),
+        ("Broker", None),
+        ("Market", "CLOSED" if title == "TOUCHDOWN" else None),
+        ("Uptime", uptime()),
+        ("Data Age", None),
+        ("CE", f"{ce:g}" if ce is not None else None),
+        ("PE", f"{pe:g}" if pe is not None else None),
+        # No verified valuation in webpospxy; omit instead of reporting false zero.
+        ("Invested", None),
+        ("Current", None),
+        ("Open PnL", money(open_pnl)),
+        ("Closed PnL", money(closed_pnl)),
+        ("Net PnL", money(net)),
+        ("PnL %", f"{daily_return:+.2f}%" if daily_return is not None else None),
+        ("Cycles", f"{cycles} Closed" if cycles is not None else None),
+        ("Errors", f"{errors} Reported"),
+        ("Warnings", f"{warnings} Reported"),
     ]
-    if title == "TAKEOFF":
-        lines += [field("Funds", "NA"), field("Positions", f"CE: {ce:g} | PE: {pe:g}" if ce is not None and pe is not None else "NA")]
-    else:
-        lines += [field("CE", f"{ce:g}" if ce is not None else "NA"),
-                  field("PE", f"{pe:g}" if pe is not None else "NA"),
-                  field("Invested", money(invested)),
-                  field("Current", money(current)),
-                  field("Open PnL", money(open_pnl)),
-                  field("Closed PnL", money(closed_pnl)),
-                  field("Net PnL", money(net))]
-        if title in {"AIRBORNE", "TOUCHDOWN"}:
-            lines += [field("PnL %" if title == "AIRBORNE" else "Return %", f"{daily_return:+.2f}%" if daily_return is not None else "NA")]
-        if title == "TOUCHDOWN":
-            wins = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) > 0)
-            losses = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) < 0)
-            lines += [field("Wins", wins if cycles is not None else "NA"),
-                      field("Losses", losses if cycles is not None else "NA")]
+    lines = ["━━━━━━━━━━━━━━━━━━━━━━━━"]
+    for label, value in report_fields:
+        formatted = available_field(label, value)
+        if formatted is not None:
+            lines.append(formatted)
+    lines.extend(["━━━━━━━━━━━━━━━━━━━━━━━━", field("Status", status)])
+    header = f"Hello {html.escape(socket.gethostname())}, {greeting}!\\n\\n{emoji} PXY — {title}"
+    message = header + "\\n<pre>" + "\\n".join(lines) + "</pre>"
     if title == "TOUCHDOWN":
-        lines.append(field("Peak Inv", money(peak)))
-    lines += [field("Cycles", f"{cycles} Closed" if cycles is not None else "NA"),
-              field("Errors", f"{errors} Reported"),
-              field("Warnings", f"{warnings} Reported"),
-              "━━━━━━━━━━━━━━━━━━━━━━━━",
-              field("Status", status)]
-    if title == "TOUCHDOWN":
-        lines += ["━━━━━━━━━━━━━━━━━━━━━━━━", f"<b>🏆 FINAL NET PNL: {html.escape(money(net))} ({f'{daily_return:+.2f}%' if daily_return is not None else 'NA'})</b>"]
-    # Preformatted content keeps ten-character label alignment in Telegram.
-    header = "\n".join(lines[:3])
-    detail = "\n".join(lines[3:-2] if title == "TOUCHDOWN" else lines[3:])
-    if title == "TOUCHDOWN":
-        return header + "\n<pre>" + detail + "</pre>\n" + "\n".join(lines[-2:])
-    return header + "\n<pre>" + detail + "</pre>"
+        suffix = f" ({daily_return:+.2f}%)" if daily_return is not None else ""
+        message += "\\n<b>🏆 FINAL NET PNL: " + html.escape(money(net)) + suffix + "</b>"
+    return message
 
 
 def trading_day(day):
