@@ -59,7 +59,11 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
         worth_factor = own_worth / opposite_worth
         count_factor = own_count - opposite_count
         cumulative_count = own_count + opposite_count
-        base_lgt = -(10.0 * (cumulative_count / 2.0) * worth_factor + 10.0 * count_factor)
+        # Monday=25, Tuesday=21, Wednesday=17, Thursday=13, Friday=9.
+        # Weekend calls retain Friday's factor until the next trading week.
+        weekday = min(datetime.now(SYSCNFGPXY_TIMEZONE).weekday(), 4)
+        lgt_factor = 25.0 - 4.0 * weekday
+        base_lgt = -(lgt_factor * (cumulative_count / 2.0) * worth_factor + lgt_factor * count_factor)
         return base_lgt
 
     except Exception as e:
