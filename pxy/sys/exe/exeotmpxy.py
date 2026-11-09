@@ -1,6 +1,6 @@
 # exeotmpxy.py
 import sys
-from datetime import date, datetime, time as dt_time
+from datetime import date, datetime
 from pathlib import Path
 
 SYS_DIR = Path(__file__).resolve().parents[1]
@@ -40,9 +40,4 @@ def get_dynamic_otm_distance(trade_date=None):
     if isinstance(distance, bool) or not isinstance(distance, (int, float)) or distance < 0:
         raise ValueError("OTM distance must be a non-negative number.")
 
-    # Fresh/default option buys use half the configured offset during
-    # the morning override. Explicit counter-buy offsets bypass this function.
-    now = datetime.now(syscnfgpxy.SYSCNFGPXY_TIMEZONE)
-    if dt_time(9, 16) <= now.time() < dt_time(9, 30) and trade_date in (None, now.date()):
-        distance = distance / 2.0
     return distance
