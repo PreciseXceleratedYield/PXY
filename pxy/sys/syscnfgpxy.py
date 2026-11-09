@@ -505,7 +505,7 @@ EXEDYNPXY_PNL_THRESHOLD = 0.0
 # Option strike selection, distance policies and position-check settings.
 # ================================================================
 # Selects ATM, fixed-offset OTM, or dynamic-offset OTM strikes.
-EXEOTMPXY_STRIKE_MODE = "OTMFIX"  # "ATM", "OTMFIX", or "OTMDYN"; applies to every option buy.
+EXEOTMPXY_STRIKE_MODE = "OTMDYN"  # "ATM", "OTMFIX", or "OTMDYN"; applies to every option buy.
 # Strike offset when fixed-distance selection is enabled.
 EXEOTMPXY_FIXED_DISTANCE = 200
 # Weekday-dependent offsets for dynamic strike selection.
