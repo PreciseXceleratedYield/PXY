@@ -43,7 +43,7 @@ if market_is_open; then
     exit 0
 fi
 
-MAX_ITERATIONS=15
+MAX_ITERATIONS=100
 echo "Starting monitor for ${MAX_ITERATIONS} iterations. Press [CTRL+C] to stop early."
 echo "----------------------------------------"
 
