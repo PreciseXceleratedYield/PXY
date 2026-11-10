@@ -86,7 +86,7 @@ def calculate_tgt(
     tsma_state=None,
     is_ce=None,
 ):
-    """Calculate targets using single-side max(power, depth) and existing dual-side rules."""
+    """Calculate targets using shared X for single-side and dual-side rules."""
     try:
         current_time = target_time
 
@@ -121,11 +121,12 @@ def calculate_tgt(
         if not both_sides_open and dt_time(9, 15) <= current_time < EXETGTPXY_PRD_LATE_DAY_TIME:
             tsma = str(tsma_state or "").upper().strip()
             tsma_aligned = (is_ce is True and tsma == "BULL") or (is_ce is False and tsma == "BEAR")
-            multiplier = 2.0 if tsma_aligned else 1.0
-            return min(
-                EXETGTPXY_PRD_MAX_TARGET_PCT,
-                multiplier * EXETGTPXY_PRD_BASE_FACTOR * max(own_power, own_depth),
+            target_pct = (
+                X / max(own_power, own_depth)
+                if tsma_aligned
+                else X / 10.0
             )
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
 
         if not is_aligned:
             # Fixed non-aligned target when both CE and PE positions are open.
