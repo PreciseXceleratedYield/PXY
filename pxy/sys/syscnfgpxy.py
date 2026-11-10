@@ -173,9 +173,9 @@ if SYSDTHAPXY_CANDLE_MODE not in {"RAW0", "RAW2", "OCC3", "HKIN", "RAW4", "HYPR"
     )
 
 # Switch or algorithm selection for signal mode.
-SYSINPXY_SIGNAL_MODE = "STMT"
+SYSINPXY_SIGNAL_MODE = "DTHA"
 # Switch or algorithm selection for signal mode.
-SYSOUTPXY_SIGNAL_MODE = "STMT"
+SYSOUTPXY_SIGNAL_MODE = "DTHA"
 # Controls inclusion of the forming candle in DTHA analyses.
 SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
