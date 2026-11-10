@@ -1,61 +1,47 @@
 #!/bin/sh
-# PXY cross-platform SSH launcher (macOS, iSH/Alpine, Linux).
+# PXY self-updating cross-platform SSH launcher.
 set -eu
 
-OS_NAME=$(uname -s)
-case "$OS_NAME" in
-  Darwin) PLATFORM="macOS" ;;
-  Linux)
-    if [ -f /proc/ish ] || { [ -r /proc/version ] && grep -qi 'ish' /proc/version; }; then
-      PLATFORM="iSH"
-    elif [ -f /etc/alpine-release ]; then
-      PLATFORM="Alpine Linux"
-    else
-      PLATFORM="Linux"
-    fi
-    ;;
-  *) PLATFORM="$OS_NAME" ;;
-esac
-
-# Keep the active launcher executable and clean only verified duplicate launchers.
-# Never remove a different script simply because it shares the same filename.
-SELF_PATH=$0
-case "$SELF_PATH" in
+SELF=$0
+case "$SELF" in
   /*) ;;
-  *) SELF_PATH=$(command -v "$SELF_PATH" 2>/dev/null || printf '%s' "$SELF_PATH") ;;
+  *) SELF=$(command -v "$SELF" 2>/dev/null || printf '%s' "$SELF") ;;
 esac
-if [ -f "$SELF_PATH" ] && [ ! -x "$SELF_PATH" ]; then
-  chmod u+x "$SELF_PATH" 2>/dev/null || :
-fi
 
-# When launched from a checked-out repository, refresh the installed copy
-# only if its content differs. Do not require network access or overwrite
-# an installed launcher when running that same installed file.
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$SELF_PATH")" 2>/dev/null && pwd)
-case "$PLATFORM" in
-  macOS|Linux|Alpine\ Linux|iSH)
-    if [ "$SCRIPT_DIR" != "/usr/local/bin" ] && [ -f "$SCRIPT_DIR/pxyadm" ] && [ -d "$SCRIPT_DIR/.git" ]; then
-      DEST=/usr/local/bin/pxyadm
-      if [ -d /usr/local/bin ] && { [ ! -f "$DEST" ] || ! cmp -s "$SELF_PATH" "$DEST"; }; then
-        if [ -w /usr/local/bin ]; then
-          install -m 755 "$SELF_PATH" "$DEST" || :
+# Obtain the latest version from authenticated GitHub CLI (private repo).
+# No anonymous downloads, embedded passwords, or automatic privilege escalation.
+if [ "${PXYADM_UPDATED:-0}" != 1 ] && command -v gh >/dev/null 2>&1; then
+  TMP=$(mktemp "${TMPDIR:-/tmp}/pxyadm.XXXXXXXX") || TMP=
+  if [ -n "$TMP" ]; then
+    if gh api -H "Accept: application/vnd.github.raw+json" \
+      "repos/PreciseXceleratedYield/PXY/contents/pxyadm?ref=main" >"$TMP" 2>/dev/null \
+      && [ -s "$TMP" ] \
+      && [ "$(head -n 1 "$TMP")" = '#!/bin/sh' ] \
+      && grep -q '^# PXY self-updating cross-platform SSH launcher\.' "$TMP"; then
+      if ! cmp -s "$TMP" "$SELF"; then
+        if [ -w "$SELF" ]; then
+          chmod 755 "$TMP"
+          if mv -f "$TMP" "$SELF"; then
+            printf 'pxyadm: updated to latest GitHub main.\n'
+            PXYADM_UPDATED=1
+            export PXYADM_UPDATED
+            exec "$SELF" "$@"
+          fi
         else
-          printf 'pxyadm: installed launcher differs; run sudo install -m 755 "%s" "%s" to refresh.\\n' "$SELF_PATH" "$DEST" >&2
+          printf 'pxyadm: newer version available, but %s is not writable.\n' "$SELF" >&2
+          printf 'pxyadm: install it once with appropriate permissions for automatic updates.\n' >&2
         fi
       fi
     fi
-    ;;
-esac
+    [ ! -f "$TMP" ] || rm -f "$TMP"
+  fi
+fi
 
-# No automatic package installation: macOS has no apk.
 if ! command -v ssh >/dev/null 2>&1; then
-  printf 'pxyadm: SSH is unavailable on %s. Install an SSH client first.\n' "$PLATFORM" >&2
+  printf 'pxyadm: SSH client not found.\n' >&2
   exit 1
 fi
 
-# Set PXY_SSH_HOST and PXY_SSH_USER to override defaults.
 REMOTE_USER=${PXY_SSH_USER:-pxy}
 REMOTE_HOST=${PXY_SSH_HOST:-20.219.143.148}
-
-# SSH keys are preferred; SSH will prompt for a password if configured.
 exec ssh -o StrictHostKeyChecking=accept-new "$REMOTE_USER@$REMOTE_HOST"
