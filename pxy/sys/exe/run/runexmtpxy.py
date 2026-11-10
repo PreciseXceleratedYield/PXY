@@ -204,10 +204,10 @@ def cycle_risk_metrics(
         or (heavy_side == "PE" and signal == "BEAR")
     )
 
-    # SIDE uses the base target; directional OUT (BULL/BEAR) doubles
-    # the investment-percentage target; the cumulative minimum stays ₹100.
+    # SIDE, BULL, and BEAR use the same 1.4% cycle profit target.
+    # NONE disables target-triggered exits; the minimum remains ₹100.
     # All calculations use only active and closed rows of the present cycle.
-    target_multiplier = 1.0 if signal == "SIDE" else 2.0 if signal in {"BULL", "BEAR"} else 0.0
+    target_multiplier = 1.0 if signal in {"SIDE", "BULL", "BEAR"} else 0.0
     target_pct = 1.4 * target_multiplier
     investment_target = premium_paid * target_pct / 100.0
     minimum_pnl = 100.0
