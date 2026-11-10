@@ -9,31 +9,20 @@ case "$SELF" in
 esac
 SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)
 SELF="$SELF_DIR/$(basename -- "$SELF")"
-TARGET=/usr/local/bin/pxyadm
+USER_BIN="${HOME}/.local/bin"
+TARGET="$USER_BIN/pxyadm"
 
-# Bootstrapping: ./pxyadm installs itself to the standard command path.
-# Replace only the known target, never unrelated copies found in PATH.
+# Download-and-run bootstrap: install to a user-owned directory, never sudo.
 if [ "$SELF" != "$TARGET" ]; then
+  mkdir -p "$USER_BIN"
   if [ ! -f "$TARGET" ] || ! cmp -s "$SELF" "$TARGET"; then
-    printf 'pxyadm: installing latest launcher to %s\n' "$TARGET"
-    if [ -w /usr/local/bin ]; then
-      install -m 755 "$SELF" "$TARGET"
-    elif command -v sudo >/dev/null 2>&1; then
-      sudo install -m 755 "$SELF" "$TARGET"
-    else
-      printf 'pxyadm: cannot install to %s (permission denied).\n' "$TARGET" >&2
-      exit 1
-    fi
+    install -m 755 "$SELF" "$TARGET"
+    printf 'pxyadm: installed in %s (no sudo).\n' "$TARGET"
   fi
-  if [ -x "$TARGET" ]; then
-    exec "$TARGET" "$@"
-  fi
-  printf 'pxyadm: installed launcher is not executable.\n' >&2
-  exit 1
+  exec "$TARGET" "$@"
 fi
 
-# Self-update on every normal launch, when gh is installed and authenticated.
-# Download to a temporary file and validate its signature before replacement.
+# On each launch, check authenticated GitHub for a newer launcher.
 if [ "${PXYADM_UPDATED:-0}" != 1 ] && command -v gh >/dev/null 2>&1; then
   TMP=$(mktemp "${TMPDIR:-/tmp}/pxyadm.XXXXXXXX") || TMP=
   if [ -n "$TMP" ]; then
@@ -44,15 +33,11 @@ if [ "${PXYADM_UPDATED:-0}" != 1 ] && command -v gh >/dev/null 2>&1; then
       && grep -q '^# PXY self-updating cross-platform SSH launcher\.' "$TMP" \
       && ! cmp -s "$TMP" "$SELF"; then
       chmod 755 "$TMP"
-      if [ -w "$SELF" ]; then
-        if mv -f "$TMP" "$SELF"; then
-          printf 'pxyadm: updated from GitHub main.\n'
-          PXYADM_UPDATED=1
-          export PXYADM_UPDATED
-          exec "$SELF" "$@"
-        fi
-      else
-        printf 'pxyadm: newer version available; administrator permission required to install.\n' >&2
+      if mv -f "$TMP" "$SELF"; then
+        printf 'pxyadm: updated from GitHub main.\n'
+        PXYADM_UPDATED=1
+        export PXYADM_UPDATED
+        exec "$SELF" "$@"
       fi
     fi
     [ ! -f "$TMP" ] || rm -f "$TMP"
