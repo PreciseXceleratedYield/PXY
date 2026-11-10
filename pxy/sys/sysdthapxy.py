@@ -17,7 +17,7 @@ from sysdtafpxy import fetch_yf_data
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     """Return a copy of OHLC data transformed using the selected DTHA mode.
 
-    RAW2, OCC3, and RAW4 replace Close with the corresponding candle average.\n    STRW uses OCC3 closes for both direction and SuperTrend.
+    RAW2, OCC3, and RAW4 replace Close with the corresponding candle average.\n    STRW uses raw OHLC candles for both direction and SuperTrend.
     HYPR preserves the former DTAF mode-0 transformation.
     TSMA retains the existing four-component synthetic close.\n    TSCL blends TSMA(Close) and actual Close equally, with prior actual Close as Open.
     HKIN applies the standard recursive Heikin-Ashi transformation.
@@ -41,10 +41,10 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
-    if mode in {"RAW0", "STMA"}:
+    if mode in {"RAW0", "STMA", "STRW"}:
         return out
 
-    if mode in {"STRW", "OCC3"}:
+    if mode == "OCC3":
         out["Close"] = (raw_open + 2.0 * raw_close) / 3.0
         return out
 
@@ -128,9 +128,9 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
 
 def get_strw_signals(df, include_running=None):
-    """Return STRW IN/OUT from OCC3 close direction and SuperTrend(1, 1).
+    """Return STRW IN/OUT from raw close direction and SuperTrend(1, 1).
 
-    IN suppresses entries on SuperTrend flips, otherwise uses ST/OCC3 disagreement.\n    Both ST and direction use the same OCC3-transformed candles. A flat close or invalid price produces NONE/SIDE.
+    IN suppresses entries on SuperTrend flips, otherwise uses ST/raw disagreement.\n    Both ST and direction use the same raw candles. A flat close or invalid price produces NONE/SIDE.
     """
     from sysstrnpxy import _compute_single_st
 
@@ -169,7 +169,7 @@ def get_strw_signals(df, include_running=None):
     else:
         return neutral
 
-    # Suppress IN on a SuperTrend flip candle; OUT retains OCC3/ST agreement behavior.
+    # Suppress IN on a SuperTrend flip candle; OUT retains raw/ST agreement behavior.
     previous_st_line = st_line[-2]
     previous_st_direction = (
         "BULL" if closes[-2] > previous_st_line
