@@ -68,41 +68,72 @@ fi
 
 REMOTE_USER=${PXY_SSH_USER:-pxy}
 REMOTE_HOST=${PXY_SSH_HOST:-20.219.143.148}
-# macOS: one-time SSH-key enrollment; Keychain remembers the key passphrase.
-# The Linux account password is requested by SSH during enrollment only.
-if [ "$(uname -s)" = Darwin ]; then
-  KEY="$HOME/.ssh/pxy_ed25519"
-  ENROLLED="$HOME/.ssh/pxy_ed25519.enrolled"
-  mkdir -p "$HOME/.ssh"
-  chmod 700 "$HOME/.ssh"
-  if [ ! -f "$KEY" ] && [ ! -f "$KEY.pub" ]; then
-    printf 'pxyadm: creating a dedicated SSH key. Choose a key passphrase; macOS Keychain will remember it.\\n'
-    ssh-keygen -t ed25519 -f "$KEY" -C "PXY Mac SSH"
-  fi
-  if [ -f "$KEY" ] && [ -f "$KEY.pub" ]; then
-    chmod 600 "$KEY"
-    if ! ssh-add --apple-use-keychain "$KEY" 2>/dev/null; then
-      ssh-add -K "$KEY" 2>/dev/null || :
+# Password mode: use OS credential vault only; never save plaintext.
+# Requires sshpass and a supported credential store.
+SERVICE="PXY-SSH-$REMOTE_HOST"
+case "$(uname -s)" in
+  Darwin)
+    if command -v security >/dev/null 2>&1; then
+      STORE=keychain
+    else
+      STORE=none
     fi
-    if [ ! -f "$ENROLLED" ]; then
-      if ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new \\
-        -o IdentitiesOnly=yes -i "$KEY" "$REMOTE_USER@$REMOTE_HOST" true 2>/dev/null; then
-        : > "$ENROLLED"
-      else
-        printf 'pxyadm: one-time setup. Enter your Linux server password to authorize this Mac.\\n'
-        if cat "$KEY.pub" | ssh -o StrictHostKeyChecking=accept-new \\
-          -o PreferredAuthentications=password,keyboard-interactive \\
-          -o PubkeyAuthentication=no "$REMOTE_USER@$REMOTE_HOST" \\
-          'umask 077; mkdir -p "$HOME/.ssh"; touch "$HOME/.ssh/authorized_keys"; chmod 700 "$HOME/.ssh"; chmod 600 "$HOME/.ssh/authorized_keys"; IFS= read -r key; grep -Fqx "$key" "$HOME/.ssh/authorized_keys" || printf "%s\\n" "$key" >> "$HOME/.ssh/authorized_keys"'; then
-          : > "$ENROLLED"
-          printf 'pxyadm: SSH key authorized. Future logins use the key.\\n'
-        else
-          printf 'pxyadm: key setup unsuccessful; falling back to normal SSH.\\n' >&2
-        fi
-      fi
+    ;;
+  Linux)
+    if command -v secret-tool >/dev/null 2>&1; then
+      STORE=secret-service
+    else
+      STORE=none
     fi
-    exec ssh -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes \\
-      -o UseKeychain=yes -i "$KEY" "$REMOTE_USER@$REMOTE_HOST"
-  fi
+    ;;
+  *) STORE=none ;;
+esac
+
+if [ "$STORE" = none ] || ! command -v sshpass >/dev/null 2>&1; then
+  printf 'pxyadm: secure password auto-login unavailable (needs sshpass and an OS credential vault).\\n' >&2
+  exec ssh -o StrictHostKeyChecking=accept-new "$REMOTE_USER@$REMOTE_HOST"
 fi
-exec ssh -o StrictHostKeyChecking=accept-new "$REMOTE_USER@$REMOTE_HOST"
+
+if [ "${1:-}" = "--reset-password" ]; then
+  case "$STORE" in
+    keychain) security delete-generic-password -s "$SERVICE" -a "$REMOTE_USER" >/dev/null 2>&1 || : ;;
+    secret-service) secret-tool clear application pxyadm host "$REMOTE_HOST" user "$REMOTE_USER" || : ;;
+  esac
+  printf 'pxyadm: stored password cleared.\\n'
+  exit 0
+fi
+
+get_saved_password() {
+  case "$STORE" in
+    keychain) security find-generic-password -s "$SERVICE" -a "$REMOTE_USER" -w 2>/dev/null ;;
+    secret-service) secret-tool lookup application pxyadm host "$REMOTE_HOST" user "$REMOTE_USER" 2>/dev/null ;;
+  esac
+}
+PASSWORD=$(get_saved_password) || PASSWORD=
+if [ -z "$PASSWORD" ]; then
+  printf 'PXY Linux password (stored in %s): ' "$STORE" >&2
+  STTY_STATE=$(stty -g 2>/dev/null || :)
+  stty -echo 2>/dev/null || :
+  IFS= read -r PASSWORD
+  if [ -n "$STTY_STATE" ]; then stty "$STTY_STATE" 2>/dev/null || :; fi
+  printf '\\n' >&2
+  [ -n "$PASSWORD" ] || { printf 'pxyadm: empty password; aborting.\\n' >&2; exit 1; }
+  # Verify before saving, so mistyped passwords are never persisted.
+  if ! SSHPASS="$PASSWORD" sshpass -e ssh -o BatchMode=no -o PubkeyAuthentication=no \
+    -o PreferredAuthentications=password -o NumberOfPasswordPrompts=1 \
+    -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new \
+    "$REMOTE_USER@$REMOTE_HOST" true; then
+    printf 'pxyadm: password verification failed; nothing saved.\\n' >&2
+    exit 1
+  fi
+  case "$STORE" in
+    keychain) security add-generic-password -U -s "$SERVICE" -a "$REMOTE_USER" -w "$PASSWORD" >/dev/null ;;
+    secret-service) printf '%s' "$PASSWORD" | secret-tool store --label="PXY SSH $REMOTE_HOST" application pxyadm host "$REMOTE_HOST" user "$REMOTE_USER" ;;
+  esac
+  printf 'pxyadm: password saved in %s.\\n' "$STORE"
+fi
+export SSHPASS="$PASSWORD"
+unset PASSWORD
+exec sshpass -e ssh -o StrictHostKeyChecking=accept-new \
+  -o PubkeyAuthentication=no -o PreferredAuthentications=password \
+  "$REMOTE_USER@$REMOTE_HOST"
