@@ -85,6 +85,8 @@ def calculate_tgt(
     exit_signal=None,
     opposite_count=0,
     own_count=0,
+    tsma_state=None,
+    is_ce=None,
 ):
     """Calculate targets using single-side max(power, depth) and existing dual-side rules."""
     try:
@@ -119,9 +121,12 @@ def calculate_tgt(
         # With only one active option side, use the higher of own power and own depth
         # from 09:15 until 15:14. The late-day override remains authoritative.
         if not both_sides_open and dt_time(9, 15) <= current_time < EXETGTPXY_PRD_LATE_DAY_TIME:
+            tsma = str(tsma_state or "").upper().strip()
+            tsma_aligned = (is_ce is True and tsma == "BULL") or (is_ce is False and tsma == "BEAR")
+            multiplier = 2.0 if tsma_aligned else 1.0
             return min(
                 EXETGTPXY_PRD_MAX_TARGET_PCT,
-                EXETGTPXY_PRD_BASE_FACTOR * max(own_power, own_depth),
+                multiplier * EXETGTPXY_PRD_BASE_FACTOR * max(own_power, own_depth),
             )
 
         if not is_aligned:
@@ -237,6 +242,8 @@ def target_price(
             exit_signal=exit_signal,
             opposite_count=pe_count if is_ce else ce_count,
             own_count=ce_count if is_ce else pe_count,
+            tsma_state=row.get("tsma"),
+            is_ce=is_ce,
         )
 
         calculated_target = entry_prc * (
