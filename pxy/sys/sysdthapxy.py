@@ -22,10 +22,10 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     TSMA retains the existing four-component synthetic close.\n    TSCL blends TSMA(Close) and actual Close equally, with prior actual Close as Open.
     HKIN applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW0", "RAW2", "OCC3", "HKIN", "RAW4", "HYPR", "TSMA", "TSCL", "STRW", "STMA"}
+    valid_modes = {"RAW0", "RAW2", "OCC3", "HKIN", "RAW4", "HYPR", "TSMA", "TSCL", "TSMAOHCL", "STRW", "STMA"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW0, RAW2, OCC3, HKIN, RAW4, HYPR, TSMA, TSCL, STRW, or STMA."
+            "DTHA mode must be RAW0, RAW2, OCC3, HKIN, RAW4, HYPR, TSMA, TSCL, TSMAOHCL, STRW, or STMA."
         )
 
     if df is None or df.empty:
@@ -67,6 +67,16 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         )
         out["Open"] = raw_close
         out["Close"] = hyper_close
+        return out
+
+    if mode == "TSMAOHCL":
+        tsma_close = calculate_moving_average(
+            pd.Series(raw_close, index=out.index),
+            period=SYSSMAPXY_TSMA_PERIOD,
+            variant="TSMA",
+        ).to_numpy(dtype=float)
+        ohlc4 = (raw_open + raw_high + raw_low + raw_close) / 4.0
+        out["Close"] = (ohlc4 + tsma_close) / 2.0
         return out
 
     if mode == "TSCL":
