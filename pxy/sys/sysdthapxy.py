@@ -41,7 +41,11 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
-    if mode in {"RAW0", "STRW", "STMA"}:
+    if mode in {"RAW0", "STMA"}:
+        return out
+
+    if mode == "STRW":
+        out["Close"] = (raw_open + raw_close) / 2.0
         return out
 
     if mode == "RAW2":
@@ -124,7 +128,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
 
 def get_strw_signals(df, include_running=None):
-    """Return STRW IN/OUT from raw close direction and SuperTrend(1, 1).
+    """Return STRW IN/OUT from OC2 close direction and SuperTrend(1, 1).
 
     IN is state-based (not a flip detector). ST and RAW0 use the same
     evaluated candles. A flat close or invalid price produces NONE/SIDE.
@@ -142,7 +146,7 @@ def get_strw_signals(df, include_running=None):
     candles = df if include_running else df.iloc[:-1]
     if len(candles) < 2:
         return neutral
-    raw = candles.loc[:, list(required)].copy()
+    raw = transform_dtha_ohlc(candles, mode="STRW").loc[:, list(required)].copy()
     for name in required:
         raw[name] = pd.to_numeric(raw[name], errors="coerce")
     if not np.isfinite(raw.to_numpy(dtype=float)).all():
