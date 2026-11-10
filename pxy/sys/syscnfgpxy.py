@@ -167,9 +167,9 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 # ================================================================
 # Switch or algorithm selection for candle mode.
 SYSDTHAPXY_CANDLE_MODE = "STRW"
-if SYSDTHAPXY_CANDLE_MODE not in {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA", "TSCL", "STRW", "STMA"}:
+if SYSDTHAPXY_CANDLE_MODE not in {"RAW0", "RAW2", "OCC3", "HKIN", "RAW4", "HYPR", "TSMA", "TSCL", "STRW", "STMA"}:
     raise ValueError(
-        "SYSDTHAPXY_CANDLE_MODE must be RAW0, RAW2, HKIN, RAW4, HYPR, TSMA, TSCL, STRW, or STMA."
+        "SYSDTHAPXY_CANDLE_MODE must be RAW0, RAW2, OCC3, HKIN, RAW4, HYPR, TSMA, TSCL, STRW, or STMA."
     )
 
 # Switch or algorithm selection for signal mode.
