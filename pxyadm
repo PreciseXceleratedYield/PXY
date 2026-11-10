@@ -19,6 +19,13 @@ if [ "$SELF" != "$TARGET" ]; then
     install -m 755 "$SELF" "$TARGET"
     printf 'pxyadm: installed in %s (no sudo).\n' "$TARGET"
   fi
+  # Retire only the known legacy launcher, if owned/writable by this user.
+  LEGACY=/usr/local/bin/pxyadm
+  if [ -f "$LEGACY" ] && [ -w "$LEGACY" ] && [ -w /usr/local/bin ]; then
+    if grep -q 'apk\|PreciseXceleratedYield' "$LEGACY" 2>/dev/null; then
+      rm -f "$LEGACY" 2>/dev/null || :
+    fi
+  fi
   # Make the user-owned launcher first in PATH for future zsh sessions.
   case "$(uname -s)" in
     Darwin)
