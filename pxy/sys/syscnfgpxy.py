@@ -474,11 +474,14 @@ EXETGTPXY_ALIGNED_MIN_DEPTH = 10
 if not math.isfinite(EXETGTPXY_ALIGNED_MIN_DEPTH) or EXETGTPXY_ALIGNED_MIN_DEPTH <= 0:
     raise ValueError("EXETGTPXY_ALIGNED_MIN_DEPTH must be finite and positive.")
 
+# Shared LGT and dual-side target multiplier.
+X = 14.0
+
 # Live PRD target calculation.
 # Base target factor for non-aligned and single-side calculations.
 EXETGTPXY_PRD_BASE_FACTOR = 1.4
 # Base percentage for aligned dual-side targets.
-EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT = 11.0
+EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT = X
 # Upper cap for computed profit targets.
 EXETGTPXY_PRD_MAX_TARGET_PCT = 99.0
 # Time after which target calculation uses its late-day cap.
