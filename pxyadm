@@ -68,6 +68,16 @@ fi
 
 REMOTE_USER=${PXY_SSH_USER:-pxy}
 REMOTE_HOST=${PXY_SSH_HOST:-20.219.143.148}
+# On the PXY host, open its existing system menu instead of SSHing to itself.
+# Require the Linux service account and the actual installed PXY tree;
+# client machines (including iSH) continue through the remote login path.
+if [ "$(uname -s)" = Linux ] && [ "$(id -un)" = pxy ]; then
+  LOCAL_MENU="$HOME/PXY/pxy/pxyadm"
+  if [ -f "$LOCAL_MENU" ] && [ -f "$HOME/PXY/pxy/pxy" ]; then
+    exec /bin/bash "$LOCAL_MENU" "$@"
+  fi
+fi
+
 # Password mode: use OS credential vault only; never save plaintext.
 # Requires sshpass and a supported credential store.
 SERVICE="PXY-SSH-$REMOTE_HOST"
