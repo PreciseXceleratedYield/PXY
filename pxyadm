@@ -7,9 +7,33 @@ case "$SELF" in
   /*) ;;
   *) SELF=$(command -v "$SELF" 2>/dev/null || printf '%s' "$SELF") ;;
 esac
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$SELF")" && pwd)
+SELF="$SELF_DIR/$(basename -- "$SELF")"
+TARGET=/usr/local/bin/pxyadm
 
-# Obtain the latest version from authenticated GitHub CLI (private repo).
-# No anonymous downloads, embedded passwords, or automatic privilege escalation.
+# Bootstrapping: ./pxyadm installs itself to the standard command path.
+# Replace only the known target, never unrelated copies found in PATH.
+if [ "$SELF" != "$TARGET" ]; then
+  if [ ! -f "$TARGET" ] || ! cmp -s "$SELF" "$TARGET"; then
+    printf 'pxyadm: installing latest launcher to %s\n' "$TARGET"
+    if [ -w /usr/local/bin ]; then
+      install -m 755 "$SELF" "$TARGET"
+    elif command -v sudo >/dev/null 2>&1; then
+      sudo install -m 755 "$SELF" "$TARGET"
+    else
+      printf 'pxyadm: cannot install to %s (permission denied).\n' "$TARGET" >&2
+      exit 1
+    fi
+  fi
+  if [ -x "$TARGET" ]; then
+    exec "$TARGET" "$@"
+  fi
+  printf 'pxyadm: installed launcher is not executable.\n' >&2
+  exit 1
+fi
+
+# Self-update on every normal launch, when gh is installed and authenticated.
+# Download to a temporary file and validate its signature before replacement.
 if [ "${PXYADM_UPDATED:-0}" != 1 ] && command -v gh >/dev/null 2>&1; then
   TMP=$(mktemp "${TMPDIR:-/tmp}/pxyadm.XXXXXXXX") || TMP=
   if [ -n "$TMP" ]; then
@@ -17,20 +41,18 @@ if [ "${PXYADM_UPDATED:-0}" != 1 ] && command -v gh >/dev/null 2>&1; then
       "repos/PreciseXceleratedYield/PXY/contents/pxyadm?ref=main" >"$TMP" 2>/dev/null \
       && [ -s "$TMP" ] \
       && [ "$(head -n 1 "$TMP")" = '#!/bin/sh' ] \
-      && grep -q '^# PXY self-updating cross-platform SSH launcher\.' "$TMP"; then
-      if ! cmp -s "$TMP" "$SELF"; then
-        if [ -w "$SELF" ]; then
-          chmod 755 "$TMP"
-          if mv -f "$TMP" "$SELF"; then
-            printf 'pxyadm: updated to latest GitHub main.\n'
-            PXYADM_UPDATED=1
-            export PXYADM_UPDATED
-            exec "$SELF" "$@"
-          fi
-        else
-          printf 'pxyadm: newer version available, but %s is not writable.\n' "$SELF" >&2
-          printf 'pxyadm: install it once with appropriate permissions for automatic updates.\n' >&2
+      && grep -q '^# PXY self-updating cross-platform SSH launcher\.' "$TMP" \
+      && ! cmp -s "$TMP" "$SELF"; then
+      chmod 755 "$TMP"
+      if [ -w "$SELF" ]; then
+        if mv -f "$TMP" "$SELF"; then
+          printf 'pxyadm: updated from GitHub main.\n'
+          PXYADM_UPDATED=1
+          export PXYADM_UPDATED
+          exec "$SELF" "$@"
         fi
+      else
+        printf 'pxyadm: newer version available; administrator permission required to install.\n' >&2
       fi
     fi
     [ ! -f "$TMP" ] || rm -f "$TMP"
