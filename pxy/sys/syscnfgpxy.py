@@ -478,7 +478,7 @@ if not math.isfinite(EXETGTPXY_ALIGNED_MIN_DEPTH) or EXETGTPXY_ALIGNED_MIN_DEPTH
 # Base target factor for non-aligned and single-side calculations.
 EXETGTPXY_PRD_BASE_FACTOR = 1.4
 # Base percentage for aligned dual-side targets.
-EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT = 33.0
+EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT = 14.0
 # Upper cap for computed profit targets.
 EXETGTPXY_PRD_MAX_TARGET_PCT = 99.0
 # Time after which target calculation uses its late-day cap.
