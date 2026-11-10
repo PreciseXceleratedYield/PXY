@@ -29,13 +29,30 @@ export PXY_MONITOR_MODE=1
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
-# Blackout: do not run the BTC-USD monitor from 09:00 to 16:00 IST on weekdays.
-# Evaluate in India time even if the Linux server uses another timezone.
+# Blackout only on actual NSE F&O trading days, 09:00–16:00 IST.
+# Share the trading engine's holiday calendar and cache. If calendar lookup
+# fails on a weekday in this window, conservatively keep the blackout.
 market_is_open() {
-    local weekday hhmm
+    local weekday hhmm status
     weekday=$(TZ=Asia/Kolkata date +%u)
     hhmm=$(TZ=Asia/Kolkata date +%H%M)
-    (( weekday >= 1 && weekday <= 5 && 10#$hhmm >= 900 && 10#$hhmm < 1600 ))
+    (( weekday >= 1 && weekday <= 5 && 10#$hhmm >= 900 && 10#$hhmm < 1600 )) || return 1
+
+    TZ=Asia/Kolkata python3 - <<'PY'
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from syshdaypxy import is_nse_fo_trading_day
+import sys
+try:
+    today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    sys.exit(0 if is_nse_fo_trading_day(today) else 1)
+except Exception as error:
+    print(f"pxymon: NSE holiday calendar unavailable; retaining weekday blackout: {error}", file=sys.stderr)
+    sys.exit(2)
+PY
+    status=$?
+    # 0 = trading day, 1 = holiday, 2 = unknown (blackout for safety).
+    (( status != 1 ))
 }
 
 if market_is_open; then
