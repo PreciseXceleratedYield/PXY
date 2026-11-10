@@ -166,16 +166,16 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 # DTHA transforms candles consumed by IN/OUT; STMT evaluates the selected candles independent of confirmation mode.
 # ================================================================
 # Switch or algorithm selection for candle mode.
-SYSDTHAPXY_CANDLE_MODE = "TSMAOHCL"
+SYSDTHAPXY_CANDLE_MODE = "RAW0"
 if SYSDTHAPXY_CANDLE_MODE not in {"RAW0", "RAW2", "OCC3", "HKIN", "RAW4", "HYPR", "TSMA", "TSCL", "TSMAOHCL", "STRW", "STMA"}:
     raise ValueError(
         "SYSDTHAPXY_CANDLE_MODE must be RAW0, RAW2, OCC3, HKIN, RAW4, HYPR, TSMA, TSCL, TSMAOHCL, STRW, or STMA."
     )
 
 # Switch or algorithm selection for signal mode.
-SYSINPXY_SIGNAL_MODE = "DTHA"
+SYSINPXY_SIGNAL_MODE = "STMT"
 # Switch or algorithm selection for signal mode.
-SYSOUTPXY_SIGNAL_MODE = "DTHA"
+SYSOUTPXY_SIGNAL_MODE = "STMT"
 # Controls inclusion of the forming candle in DTHA analyses.
 SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
@@ -308,7 +308,7 @@ if SYSPLCHRTPXY_OHLC_MODE not in {1, 2, 3, 4, 5, 6}:
 # ATR lookback for the primary Supertrend.
 SYSDTSTPXY_ST1_PERIOD = 1
 # ATR multiplier for the primary Supertrend.
-SYSDTSTPXY_ST1_FACTOR = 1.0
+SYSDTSTPXY_ST1_FACTOR = 0.5
 
 # BOS morning recognition ends at 10:10; its opening boundary uses the shared
 # exchange open above.
