@@ -372,7 +372,7 @@ def snapshot_report(title, state=None):
         if formatted is not None:
             lines.append(formatted)
     lines.extend(["━━━━━━━━━━━━━━━━━━━━━━━━", field("Status", status)])
-    header = f"Hello {html.escape(socket.gethostname())}, {greeting}!\n\n{emoji} PXY — {title}"
+    header = f"{emoji} PXY CONTROL TOWER — {title}\n🌤️ {greeting}, {html.escape(socket.gethostname())}!\n━━━━━━━━━━━━━━━━━━━━━━━━"
     if title == "TOUCHDOWN":
         cycle_groups = {}
         for row in closed:
@@ -395,16 +395,16 @@ def snapshot_report(title, state=None):
             capital = daily_peak_investment(rows)
             pct = (100 * cycle_pnl / capital) if capital is not None and capital > 0 else None
             suffix = f" ({pct:+.2f}%)" if pct is not None else ""
-            summary.append(f"CYCLE #{html.escape(cycle_id)} PNL: {html.escape(money(cycle_pnl))}{suffix}")
+            summary.append(f"{'💚' if cycle_pnl >= 0 else '❤️'} CYCLE #{html.escape(cycle_id)} PNL: {html.escape(money(cycle_pnl))}{suffix}")
         suffix = f" ({daily_return:+.2f}%)" if daily_return is not None else ""
-        message = header + "\n<pre>" + field("Status", status) + "</pre>"
+        message = header + "\n" + ("✅" if landed else "⚠️") + " <b>" + html.escape(field("Status", status)) + "</b>" + "\n🏆 DAILY PERFORMANCE"
         if summary:
             message += "\n<pre>" + "\n".join(summary) + "</pre>"
         message += "\n━━━━━━━━━━━━━━━━━━━━━━━━"
         message += "\n<b>🏆 FINAL NET PNL: " + html.escape(money(net)) + suffix + "</b>"
-        message += "\n\n<pre>" + "\n".join(lines[:-2]) + "</pre>"
+        message += "\n\n📊 END-OF-DAY DATASHEET\n<pre>" + "\n".join(lines[:-2]) + "</pre>\n🌙 MARKET CLOSED"
     else:
-        message = header + "\n<pre>" + "\n".join(lines) + "</pre>"
+        message = header + "\n" + ("🟢 SYSTEM STATUS" if health else "⚠️ SYSTEM ATTENTION") + "\n<pre>" + "\n".join(lines) + "</pre>"
     return message
 
 
@@ -454,7 +454,7 @@ def scan_cycles(state):
         times = [str(r.get("Exit_Time", "")) for r in rows if r.get("Exit_Time")]
         exit_time = max(times) if times else "NA"
         lines = [
-            f"📕 PXY — CYCLE #{html.escape(cycle)} CLOSED",
+            f"{'💚' if pnl is not None and pnl >= 0 else '❤️' if pnl is not None else '📘'} PXY — CYCLE #{html.escape(cycle)} CLOSED",
             "━━━━━━━━━━━━━━━━━━━━━━━━",
             field("Exit", exit_time),
             field("Peak Inv", money(peak)),
@@ -501,7 +501,7 @@ def capture_lines(state):
 
 def event_message(kind, issue, stamp):
     recovered = kind == "RECOVERY"
-    label = "🟢 PXY — EVENT RECOVERED" if recovered else "🚨 PXY — EVENT ALERT"
+    label = "🟢🛡️ PXY — EVENT RECOVERED" if recovered else "🚨🛡️ PXY — EVENT ALERT"
     greeting = "Good News! ✅" if recovered else "Attention Required! ⚠️"
     first = datetime.fromisoformat(issue["first"])
     duration = max(0, int((stamp - first).total_seconds()))
@@ -522,7 +522,7 @@ def event_message(kind, issue, stamp):
         "━━━━━━━━━━━━━━━━━━━━━━━━",
         field("Status", "RECOVERED" if recovered else "ACTIVE"),
     ]
-    result = f"Hello {html.escape(socket.gethostname())}, {greeting}\n\n{label}\n<pre>" + "\n".join(lines) + "</pre>"
+    result = f"{label}\n━━━━━━━━━━━━━━━━━━━━━━━━\nHello {html.escape(socket.gethostname())}, {greeting}\n<pre>" + "\n".join(lines) + "</pre>"
     if not recovered:
         result += "\n<b>Error Details</b>\n" + html.escape(details[:350])
     return result
