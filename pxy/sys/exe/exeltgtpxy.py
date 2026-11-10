@@ -26,6 +26,7 @@ from syscnfgpxy import (
     EXETGTPXY_PRD_LATE_DAY_TIME,
     EXETGTPXY_PRD_MAX_TARGET_PCT,
     SYSCNFGPXY_TIMEZONE,
+    X,
 )
 
 # ==================== CONFIG ====================
@@ -59,8 +60,7 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
         worth_factor = own_worth / opposite_worth
         count_factor = own_count - opposite_count
         cumulative_count = own_count + opposite_count
-        # Fixed LGT multiplier X for all trading days.
-        X = 14.0
+        # Shared LGT and target factor imported from configuration.
         base_lgt = -(X * (cumulative_count / 2.0) * worth_factor + X * count_factor)
         return base_lgt
 
