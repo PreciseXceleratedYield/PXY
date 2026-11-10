@@ -130,7 +130,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 def get_strw_signals(df, include_running=None):
     """Return STRW IN/OUT from OCC3 close direction and SuperTrend(1, 1).
 
-    IN gives SuperTrend flips priority, then uses ST/OCC3 disagreement.\n    Both ST and direction use the same OCC3-transformed candles. A flat close or invalid price produces NONE/SIDE.
+    IN suppresses entries on SuperTrend flips, otherwise uses ST/OCC3 disagreement.\n    Both ST and direction use the same OCC3-transformed candles. A flat close or invalid price produces NONE/SIDE.
     """
     from sysstrnpxy import _compute_single_st
 
@@ -169,8 +169,7 @@ def get_strw_signals(df, include_running=None):
     else:
         return neutral
 
-    # A SuperTrend direction flip takes priority for IN on the flip candle
-    # only. OUT retains its existing OCC3/ST agreement behavior.
+    # Suppress IN on a SuperTrend flip candle; OUT retains OCC3/ST agreement behavior.
     previous_st_line = st_line[-2]
     previous_st_direction = (
         "BULL" if closes[-2] > previous_st_line
@@ -182,7 +181,7 @@ def get_strw_signals(df, include_running=None):
     else:
         out_signal = "SIDE"
     if previous_st_direction is not None and previous_st_direction != st_direction:
-        return ("BUY" if st_direction == "BULL" else "SELL", out_signal)
+        return ("NONE", out_signal)
     if st_direction == raw_direction:
         return ("NONE", out_signal)
     return ("BUY" if st_direction == "BULL" else "SELL", out_signal)
