@@ -17,15 +17,15 @@ from sysdtafpxy import fetch_yf_data
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     """Return a copy of OHLC data transformed using the selected DTHA mode.
 
-    RAW2 and RAW4 replace Close with the corresponding candle average.
+    RAW2, OCC3, and RAW4 replace Close with the corresponding candle average.\n    STRW uses OCC3 closes for both direction and SuperTrend.
     HYPR preserves the former DTAF mode-0 transformation.
     TSMA retains the existing four-component synthetic close.\n    TSCL blends TSMA(Close) and actual Close equally, with prior actual Close as Open.
     HKIN applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA", "TSCL", "STRW", "STMA"}
+    valid_modes = {"RAW0", "RAW2", "OCC3", "HKIN", "RAW4", "HYPR", "TSMA", "TSCL", "STRW", "STMA"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW0, RAW2, HKIN, RAW4, HYPR, TSMA, TSCL, STRW, or STMA."
+            "DTHA mode must be RAW0, RAW2, OCC3, HKIN, RAW4, HYPR, TSMA, TSCL, STRW, or STMA."
         )
 
     if df is None or df.empty:
@@ -44,8 +44,8 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     if mode in {"RAW0", "STMA"}:
         return out
 
-    if mode == "STRW":
-        out["Close"] = (raw_open + raw_close) / 2.0
+    if mode in {"STRW", "OCC3"}:
+        out["Close"] = (raw_open + 2.0 * raw_close) / 3.0
         return out
 
     if mode == "RAW2":
@@ -128,10 +128,9 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
 
 def get_strw_signals(df, include_running=None):
-    """Return STRW IN/OUT from OC2 close direction and SuperTrend(1, 1).
+    """Return STRW IN/OUT from OCC3 close direction and SuperTrend(1, 1).
 
-    IN is state-based (not a flip detector). ST and RAW0 use the same
-    evaluated candles. A flat close or invalid price produces NONE/SIDE.
+    IN gives SuperTrend flips priority, then uses ST/OCC3 disagreement.\n    Both ST and direction use the same OCC3-transformed candles. A flat close or invalid price produces NONE/SIDE.
     """
     from sysstrnpxy import _compute_single_st
 
@@ -171,7 +170,7 @@ def get_strw_signals(df, include_running=None):
         return neutral
 
     # A SuperTrend direction flip takes priority for IN on the flip candle
-    # only. OUT retains its existing RAW0/ST agreement behavior.
+    # only. OUT retains its existing OCC3/ST agreement behavior.
     previous_st_line = st_line[-2]
     previous_st_direction = (
         "BULL" if closes[-2] > previous_st_line
