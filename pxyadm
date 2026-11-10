@@ -1,40 +1,31 @@
 #!/bin/sh
+# PXY cross-platform SSH launcher (macOS, iSH/Alpine, Linux).
+set -eu
 
-# 1. Self-Deployment Check
-# If executed locally as a standalone file, install it globally and clean up old instances
-TARGET_BIN="/usr/local/bin/pxyadm"
-CURRENT_SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
-
-if [ "$CURRENT_SCRIPT_PATH" != "$TARGET_BIN" ]; then
-    echo "[+] Deploying pxyadm to system binaries..."
-    
-    # Remove old version if it exists
-    if [ -f "$TARGET_BIN" ]; then
-        sudo rm -f "$TARGET_BIN"
+OS_NAME=$(uname -s)
+case "$OS_NAME" in
+  Darwin) PLATFORM="macOS" ;;
+  Linux)
+    if [ -f /proc/ish ] || { [ -r /proc/version ] && grep -qi 'ish' /proc/version; }; then
+      PLATFORM="iSH"
+    elif [ -f /etc/alpine-release ]; then
+      PLATFORM="Alpine Linux"
+    else
+      PLATFORM="Linux"
     fi
-    
-    # Copy current script to destination and make it executable
-    sudo cp "$CURRENT_SCRIPT_PATH" "$TARGET_BIN"
-    sudo chmod +x "$TARGET_BIN"
-    
-    echo "[───] Deployment complete! You can now run it globally using: pxyadm"
-    exit 0
+    ;;
+  *) PLATFORM="$OS_NAME" ;;
+esac
+
+# No automatic package installation: macOS has no apk.
+if ! command -v ssh >/dev/null 2>&1; then
+  printf 'pxyadm: SSH is unavailable on %s. Install an SSH client first.\n' "$PLATFORM" >&2
+  exit 1
 fi
 
-# 2. Operating System Check (Mac vs Linux)
-OS_TYPE=$(uname)
+# Set PXY_SSH_HOST and PXY_SSH_USER to override defaults.
+REMOTE_USER=${PXY_SSH_USER:-pxy}
+REMOTE_HOST=${PXY_SSH_HOST:-20.219.143.148}
 
-if [ "$OS_TYPE" = "Linux" ]; then
-    # Only try to handle dependencies if running on Linux/Alpine
-    if ! command -v sshpass >/dev/null 2>&1; then
-        sudo apk update && sudo apk add sshpass 2>/dev/null || apk update && apk add sshpass
-    fi
-fi
-
-# 3. Target server credentials
-REMOTE_USER="pxy"
-REMOTE_PASS="Pxy@tatlako00"
-BHANU_IP="20.219.143.148"
-
-# 4. Direct SSH Connection
-sshpass -p "$REMOTE_PASS" ssh -o StrictHostKeyChecking=no "$REMOTE_USER@$BHANU_IP"
+# SSH keys are preferred; SSH will prompt for a password if configured.
+exec ssh -o StrictHostKeyChecking=accept-new "$REMOTE_USER@$REMOTE_HOST"
