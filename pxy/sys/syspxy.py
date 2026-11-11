@@ -65,7 +65,7 @@ def get_all_data():
     # Reuse the existing timestamp-validated Kotak Futures feed; no new API call.
     # Average Futures and NIFTY index when both exist; otherwise use the available source.
     # This changes only the published price, never the OHLC or indicators.
-    futures_price = _read_nifty_futures_price(max_age_seconds=30 * 60)
+    futures_price = _read_nifty_futures_price(max_age_seconds=5 * 60)
     index_price = core.get("price") if core.get("market_data_available", False) else None
     try:
         index_price = float(index_price)
