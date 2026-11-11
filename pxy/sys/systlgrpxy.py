@@ -292,11 +292,77 @@ def daily_peak_investment(rows):
     return peak
 
 
+def webpxy_cycle_groups(trades, cycle_state):
+    """Mirror WebPXY trade grouping: risk-cycle tags/time, then ledger Cycle_ID."""
+    if not isinstance(trades, list):
+        return {}
+
+    def parsed(value):
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=TZ)
+        except (ValueError, TypeError):
+            return None
+
+    risk_cycles = cycle_state.get("closed_cycles", [])
+    risk_cycles = list(risk_cycles) if isinstance(risk_cycles, list) else []
+    if not risk_cycles and isinstance(cycle_state.get("last_closed_snapshot"), dict):
+        snapshot = dict(cycle_state["last_closed_snapshot"])
+        snapshot.setdefault("cycle_id", cycle_state.get("closed_cycle_count"))
+        snapshot.setdefault("cycle_tags", [p.get("tag") for p in snapshot.get("positions", [])
+                                            if isinstance(p, dict)])
+        risk_cycles = [snapshot]
+    active_id = cycle_state.get("active_cycle_id")
+    if active_id is not None:
+        risk_cycles.append({"cycle_id": active_id,
+                            "cycle_tags": cycle_state.get("active_cycle_tags", []),
+                            "cycle_started_at": cycle_state.get("active_cycle_started_at")})
+    groups = {}
+    for index, row in enumerate(trades):
+        if not isinstance(row, dict):
+            continue
+        tag = str(row.get("Tag") or "").strip()
+        entered = parsed(row.get("Buy_Time"))
+        candidates = []
+        for book in risk_cycles:
+            if not isinstance(book, dict):
+                continue
+            tags = {str(t).strip() for t in (book.get("cycle_tags") or [])}
+            if tag not in tags:
+                continue
+            start, end = parsed(book.get("cycle_started_at")), parsed(book.get("closed_at"))
+            if entered is None or ((start is None or entered >= start)
+                                   and (end is None or entered <= end)):
+                candidates.append(book)
+        if entered is None:
+            match = candidates[0] if len(candidates) == 1 else None
+        else:
+            match = max(candidates, key=lambda b: parsed(b.get("cycle_started_at"))
+                        or datetime.min.replace(tzinfo=TZ), default=None)
+        legacy_id = row.get("Cycle_ID")
+        if match is not None:
+            cycle_id = str(match.get("cycle_id"))
+            key = "risk-cycle-" + cycle_id
+        elif legacy_id is not None and str(legacy_id) != "":
+            cycle_id = str(legacy_id)
+            key = "cycle-" + cycle_id
+        else:
+            cycle_id = ""
+            key = "unassigned-" + str(index)
+        group = groups.setdefault(key, {"id": cycle_id, "rows": [], "open": False})
+        group["rows"].append(row)
+        group["open"] |= str(row.get("Status", "CLOSED")).upper() == "OPEN"
+    return groups
+
+
 def snapshot_report(title, state=None):
     state = state or {}
     stamp = now()
     positions = fresh_json("webpospxy")
     trades = fresh_json("webpnlpxy")
+    cycle_groups = webpxy_cycle_groups(trades, fresh_json("webrinkopxy") or {})
     engine = engine_alive()
     web = service_web()
     watch = running("pxywatch.service")
@@ -374,19 +440,11 @@ def snapshot_report(title, state=None):
     lines.extend(["━━━━━━━━━━━━━━━━━━━━━━━━", field("Status", status)])
     header = f"{emoji} PXY CONTROL TOWER — {title}\n🌤️ {greeting}, {html.escape(socket.gethostname())}!\n━━━━━━━━━━━━━━━━━━━━━━━━"
     if title == "TOUCHDOWN":
-        cycle_groups = {}
-        for row in closed:
-            cycle_id = row.get("Cycle_ID")
-            if cycle_id is not None:
-                cycle_groups.setdefault(str(cycle_id), []).append(row)
         summary = []
-        for cycle_id, rows in sorted(
-            cycle_groups.items(),
-            key=lambda pair: max(str(r.get("Exit_Time", "")) for r in pair[1]),
-        ):
-            all_rows = [r for r in trades if isinstance(r, dict)
-                        and str(r.get("Cycle_ID")) == cycle_id]
-            if len(all_rows) != len(rows):
+        for group in sorted(cycle_groups.values(),
+                            key=lambda g: max((str(r.get("Exit_Time", "")) for r in g["rows"]), default="")):
+            rows = group["rows"]
+            if group["open"] or any(str(r.get("Status", "CLOSED")).upper() != "CLOSED" for r in rows):
                 continue
             amounts = [safe_number(r.get("PNL")) for r in rows]
             cycle_pnl = sum(amounts) if all(v is not None for v in amounts) else None
@@ -395,7 +453,7 @@ def snapshot_report(title, state=None):
             capital = daily_peak_investment(rows)
             pct = (100 * cycle_pnl / capital) if capital is not None and capital > 0 else None
             suffix = f" ({pct:+.2f}%)" if pct is not None else ""
-            summary.append(f"{'💚' if cycle_pnl >= 0 else '❤️'} CYCLE #{html.escape(cycle_id)} PNL: {html.escape(money(cycle_pnl))}{suffix}")
+            summary.append(f"{'💚' if cycle_pnl >= 0 else '❤️'} CYCLE #{html.escape(group['id'])} PNL: {html.escape(money(cycle_pnl))}{suffix}")
         suffix = f" ({daily_return:+.2f}%)" if daily_return is not None else ""
         message = header + "\n" + ("✅" if landed else "⚠️") + " <b>" + html.escape(field("Status", status)) + "</b>" + "\n🏆 DAILY PERFORMANCE"
         if summary:
@@ -428,17 +486,11 @@ def scan_cycles(state):
     trades = fresh_json("webpnlpxy")
     if not isinstance(trades, list):
         return
-    cycles = {}
-    for row in trades:
-        if not isinstance(row, dict):
-            continue
-        cycle = row.get("Cycle_ID")
-        if cycle is None:
-            continue
-        cycles.setdefault(str(cycle), []).append(row)
+    cycles = webpxy_cycle_groups(trades, fresh_json("webrinkopxy") or {})
     day = now().date().isoformat()
-    for cycle, rows in cycles.items():
-        if any(str(r.get("Status", "")).upper() == "OPEN" for r in rows):
+    for group in cycles.values():
+        cycle, rows = group["id"], group["rows"]
+        if group["open"]:
             continue
         if not rows or any(str(r.get("Status", "")).upper() != "CLOSED" for r in rows):
             continue
