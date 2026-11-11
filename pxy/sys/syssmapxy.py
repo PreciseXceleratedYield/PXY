@@ -87,7 +87,7 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     if df is None or df.empty or len(df) < SYSSMAPXY_MA_PERIOD:
         print("Invalid data. Cannot dump single candle JSON.")
         return
-    from sysdthapxy import transform_dtha_ohlc
+    from sysdthapxy import transform_dtha_ohlc, publish_dtha_json_payload
     df = transform_dtha_ohlc(df)
     # 1. Grab the configured moving-average window for the range boundaries.
     window = df.iloc[-SYSSMAPXY_MA_PERIOD:]
@@ -112,7 +112,7 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     # Save (always replaces existing file)
     json_path = os.path.join(sibling_dir, 'websmapxy.json')
     # Dump directly using pandas frame
-    pd.DataFrame(candle_data).to_json(json_path, orient='records', indent=4)
+    publish_dtha_json_payload(candle_data, json_path, indent=4)
     print(f"Custom Trend Candle replaced successfully at: {json_path}")
 
 if __name__ == "__main__":
