@@ -1719,31 +1719,41 @@ function drawRiskCandle(floor,net,peak){
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);
     const PADX=12,midY=H/2,fz=15,bodyH=fz+12;
-    const lo=Math.min(floor,net),hi=Math.max(peak,net,10),open=0,close=net,range=hi-lo||1;
-    const toX=v=>Math.max(PADX,Math.min(W-PADX,((v-lo)/range)*(W-PADX*2)+PADX));
-    const lowX=toX(lo),highX=toX(hi),openX=toX(open),closeX=toX(close);
-    const isBull=close>=open;
-    const bodyColor=isBull?cssVar('--risk-bull'):cssVar('--risk-bear');
-    const glowColor=isBull?cssVar('--glow-bull'):cssVar('--glow-bear');
+    const centerX=W/2,halfW=Math.max(0,W/2-PADX);
+    const booked=Number(riskData.booked_profit??bookedTotal)||0;
+    const running=Number(net)||0;
+    const combined=booked+running;
+    const denominator=Math.abs(booked)+Math.abs(running);
+    // Net direction selects the half; opposing PNL reduces the filled fraction.
+    // Same-sign booked/running PNL fills the entire corresponding half.
+    const fraction=denominator>0?Math.min(1,Math.abs(combined)/denominator):0;
+    const extent=halfW*fraction;
+    const left=combined<0?centerX-extent:centerX;
+    const bodyColor=combined<0?cssVar('--risk-bear'):cssVar('--risk-bull');
+    const by=midY-bodyH/2;
     ctx.strokeStyle=cssVar('--rk-grid');ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(lowX,midY);ctx.lineTo(highX,midY);ctx.stroke();
-    ctx.lineWidth=3;ctx.lineCap='round';ctx.globalAlpha=0.8;
-    ctx.strokeStyle=cssVar('--risk-bear');ctx.beginPath();ctx.moveTo(lowX,midY-bodyH/2);ctx.lineTo(lowX,midY+bodyH/2);ctx.stroke();
-    ctx.strokeStyle=cssVar('--risk-bull');ctx.beginPath();ctx.moveTo(highX,midY-bodyH/2);ctx.lineTo(highX,midY+bodyH/2);ctx.stroke();
-    ctx.globalAlpha=1;ctx.lineCap='butt';
-    if(openX>PADX+2&&openX<W-PADX-2){
-        ctx.strokeStyle=cssVar('--rk-dash');ctx.lineWidth=1;ctx.setLineDash([3,3]);
-        ctx.beginPath();ctx.moveTo(openX,midY-bodyH/2);ctx.lineTo(openX,midY+bodyH/2);ctx.stroke();
-        ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(PADX,midY);ctx.lineTo(W-PADX,midY);ctx.stroke();
+    // Always-visible zero divider, independent of the exit/peak scale.
+    ctx.strokeStyle=cssVar('--rk-dash');ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(centerX,3);ctx.lineTo(centerX,H-3);ctx.stroke();
+    ctx.setLineDash([]);
+    if(extent>0){
+        ctx.fillStyle=bodyColor;
+        ctx.beginPath();ctx.roundRect(left,by,extent,bodyH,Math.min(6,extent/2));ctx.fill();
+        const hl=ctx.createLinearGradient(0,by,0,by+bodyH);
+        hl.addColorStop(0,cssVar('--hl-top'));
+        hl.addColorStop(0.55,'rgba(255,255,255,0)');
+        hl.addColorStop(1,cssVar('--hl-bot'));
+        ctx.fillStyle=hl;
+        ctx.beginPath();ctx.roundRect(left,by,extent,bodyH,Math.min(6,extent/2));ctx.fill();
     }
-    /* The chip is the current cycle; the body is cumulative realized profit. */
-    const sumVal=Number(riskData.booked_profit??bookedTotal)||0;
+    // Keep both original values and the closed-cycle count visible regardless
+    // of how narrow the PNL-proportional candle becomes.
     const bookCount=Number(riskData.closed_cycle_count)||0;
-    const overallBull=sumVal>=0;
-    const overallColor=overallBull?cssVar('--risk-bull'):cssVar('--risk-bear');
-    const netColor=isBull?cssVar('--risk-bull'):cssVar('--risk-bear');
-    const netTxt='₹'+(net>=0?'+':'')+Math.round(net);
-    const sumTxt=fmt(sumVal);
+    const netTxt='₹'+(running>=0?'+':'')+Math.round(running);
+    const sumTxt=fmt(booked);
+    const netColor=running>=0?cssVar('--risk-bull'):cssVar('--risk-bear');
+    const overallColor=booked>=0?cssVar('--risk-bull'):cssVar('--risk-bear');
     const mainFont=`800 ${fz}px 'Syne',sans-serif`,chipFont=`800 ${fz-1}px 'Syne',sans-serif`;
     ctx.font=chipFont;const wNet=ctx.measureText(netTxt).width;
     ctx.font=mainFont;const wSum=ctx.measureText(sumTxt).width;
@@ -1751,35 +1761,21 @@ function drawRiskCandle(floor,net,peak){
     ctx.font=countFont;const wCount=ctx.measureText(String(bookCount)).width;
     const CHIP_PAD=7,GAP=9,chipW=wNet+CHIP_PAD*2,chipH=bodyH-8;
     const contentW=chipW+GAP+wSum+2+wCount;
-    const textW=contentW+20;
-    /* ── body geometry (extent still open→net) ── */
-    let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
-    const midX=(bx1+bx2)/2;
-    let bW=Math.max(bx2-bx1,textW);
-    bx1=midX-bW/2;bx2=midX+bW/2;
-    if(bx1<PADX){bx2+=PADX-bx1;bx1=PADX;}
-    if(bx2>W-PADX){bx1-=bx2-(W-PADX);bx2=W-PADX;}
-    bx1=Math.max(PADX,bx1);bW=bx2-bx1;
-    const by=midY-bodyH/2;
-    /* body = overall colour with soft top highlight */
-    ctx.fillStyle=overallColor;
-    ctx.beginPath();ctx.roundRect(bx1,by,bW,bodyH,6);ctx.fill();
-    const hl=ctx.createLinearGradient(0,by,0,by+bodyH);
-    hl.addColorStop(0,cssVar('--hl-top'));hl.addColorStop(0.55,'rgba(255,255,255,0)');hl.addColorStop(1,cssVar('--hl-bot'));
-    ctx.fillStyle=hl;
-    ctx.beginPath();ctx.roundRect(bx1,by,bW,bodyH,6);ctx.fill();
-    /* labels: net chip (left, net colour)  |  overall (right, on body) */
-    const sx=(bx1+bx2)/2-contentW/2;
-    ctx.textBaseline='middle';
+    const sx=Math.max(PADX,Math.min(W-PADX-contentW,centerX-contentW/2));
     const cx=sx,cy=midY-chipH/2;
+    ctx.textBaseline='middle';
     ctx.fillStyle=cssVar('--chip-bg');
     ctx.beginPath();ctx.roundRect(cx,cy,chipW,chipH,5);ctx.fill();
     ctx.strokeStyle=netColor;ctx.globalAlpha=0.55;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;
     ctx.font=chipFont;ctx.textAlign='center';ctx.fillStyle=netColor;
     ctx.fillText(netTxt,cx+chipW/2,midY+0.5);
-    ctx.font=mainFont;ctx.textAlign='left';ctx.fillStyle=overallBull?cssVar('--on-bull'):cssVar('--on-bear');
-    ctx.fillText(sumTxt,sx+chipW+GAP,midY+0.5);
-    ctx.font=countFont;ctx.fillText(String(bookCount),sx+chipW+GAP+wSum+2,midY-fz*0.24);
+    // Separate neutral label backing keeps booked PNL readable over any fill.
+    const bookedX=sx+chipW+GAP;
+    ctx.fillStyle=cssVar('--chip-bg');
+    ctx.beginPath();ctx.roundRect(bookedX-3,cy,wSum+wCount+8,chipH,4);ctx.fill();
+    ctx.font=mainFont;ctx.textAlign='left';ctx.fillStyle=overallColor;
+    ctx.fillText(sumTxt,bookedX,midY+0.5);
+    ctx.font=countFont;ctx.fillText(String(bookCount),bookedX+wSum+2,midY-fz*0.24);
     const danger=net<=floor+Math.abs(floor)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
 }
