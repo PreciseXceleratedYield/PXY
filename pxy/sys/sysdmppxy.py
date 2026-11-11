@@ -5,7 +5,7 @@ import warnings
 import tempfile
 import pandas as pd
 import yfinance as yf
-from sysdthapxy import transform_dtha_ohlc
+from sysdthapxy import export_dtha_json
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from syscnfgpxy import (
@@ -64,34 +64,14 @@ def _run_independent_engine_production():
             
             target_export_path = os.path.join(target_web_directory, "webdaypxy.json")
             
-            # 🟢 STEP 5: WRITE A COMPLETE JSON FILE, THEN ATOMICALLY PUBLISH IT.
-            # A unique temporary file also keeps concurrent dump processes separate.
-            temp_export_path = None
-            try:
-                with tempfile.NamedTemporaryFile(
-                    mode="w",
-                    encoding="utf-8",
-                    dir=target_web_directory,
-                    prefix=".webdaypxy.",
-                    suffix=".tmp",
-                    delete=False,
-                ) as temp_file:
-                    temp_export_path = temp_file.name
-
-                transform_dtha_ohlc(raw_data).to_json(
-                    temp_export_path,
-                    date_format="iso",
-                    orient="split",
-                )
-                os.replace(temp_export_path, target_export_path)
-                temp_export_path = None
-            finally:
-                if temp_export_path and os.path.exists(temp_export_path):
-                    os.remove(temp_export_path)
+            # DTHA owns transformation and atomic JSON publication.
+            # Preserve the existing split-oriented WebPXY JSON contract.
+            processed_df = export_dtha_json(
+                raw_data, target_export_path, orient="split", date_format="iso"
+            )
 
             print("📦 DTHA JSON DUMP SUCCESS (IST)")
             
-            processed_df = transform_dtha_ohlc(raw_data)
             print(f"✅ ENGINE SUCCESS | Session Rows Saved: {len(processed_df)}")
             return processed_df
             
