@@ -265,7 +265,18 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
                 active_df["tag"] = active_df["tag"].astype(str).str.split(".").str[0].replace("nan", "").str.strip()
                         
         except Exception as e:
-            print(f"OMS DATA ERROR: {e}")
+            # Some broker SDK exceptions implement __str__ incorrectly and return None.
+            # Never let error reporting raise another exception or mask the root cause.
+            import traceback
+            try:
+                detail = str(e)
+            except Exception:
+                detail = f"<unprintable exception; args={e.args!r}>"
+            print(f"OMS DATA ERROR [{type(e).__name__}]: {detail}")
+            frames = traceback.extract_tb(e.__traceback__)
+            if frames:
+                frame = frames[-1]
+                print(f"OMS ERROR LOCATION: {frame.filename}:{frame.lineno} in {frame.name}")
             active_df = pd.DataFrame()
             combined["error"] = True
 
