@@ -1157,9 +1157,9 @@ function drawChart(candles){
         // No fill whatsoever: the original chart background stays fully visible.
         // Draw only a subtle, semi-transparent candle-body border.
         ctx.save();
-        ctx.globalAlpha=0.55;
-        ctx.strokeStyle=color;
-        ctx.lineWidth=1;
+        ctx.globalAlpha=0.95;
+        ctx.strokeStyle=candleDirection(c.c,prevClose)==='BULL'?'#00d66b':candleDirection(c.c,prevClose)==='BEAR'?'#ff424a':color;
+        ctx.lineWidth=1.4;
         ctx.beginPath();
         ctx.roundRect(bx,bodyTop,bodyW,bodyH,r);
         ctx.stroke();
