@@ -1122,7 +1122,7 @@ function drawChart(candles){
         priceTag.style.color=directionColor(candleDirection(lastClose,prevC));
     }
 
-    // candles — flat matte bodies
+    // candles — outline-only bodies with transparent centers
     if(chartMode==='line'){
         ctx.beginPath();
         let started=false;
@@ -1150,10 +1150,12 @@ function drawChart(candles){
         const bx=x-bodyW/2;
         const r=Math.min(bodyW/2,2);
 
-        ctx.fillStyle=color;
+        // Outline only: keep the chart/grid/indicator lines visible through each body.
+        ctx.strokeStyle=color;
+        ctx.lineWidth=1.4;
         ctx.beginPath();
         ctx.roundRect(bx,bodyTop,bodyW,bodyH,r);
-        ctx.fill();
+        ctx.stroke();
     });
     }
 
