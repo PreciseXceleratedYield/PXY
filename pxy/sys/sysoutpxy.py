@@ -6,7 +6,7 @@ from syscnfgpxy import (
     SYSOUTPXY_SIGNAL_MODE,
 )
 from sysdtafpxy import fetch_yf_data
-from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states, get_strw_signals, get_stma_signals
+from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states, get_supr_signals, get_stma_signals
 
 
 def get_out_candles(df):
@@ -31,8 +31,8 @@ def get_signal(df=None):
             states = get_stmt_states(df)
             return str(states.iloc[-1]) if not states.empty else "NONE"
 
-        if SYSOUTPXY_SIGNAL_MODE == "STRW":
-            return get_strw_signals(df)[1]
+        if SYSOUTPXY_SIGNAL_MODE == "SUPR":
+            return get_supr_signals(df)[1]
 
         if SYSOUTPXY_SIGNAL_MODE != "TSMA":
             return "NONE"
