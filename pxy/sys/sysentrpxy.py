@@ -2,8 +2,6 @@ from datetime import datetime, time as dt_time
 from pathlib import Path
 import sys
 
-from sysmktpxy import get_signals as get_market_signals
-from sysdirpxy import detect_raw_direction
 from sysmrngpxy import get_morning_direction
 from sysbbospxy import get_bos_bar
 from syscnfgpxy import (
@@ -51,58 +49,31 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     else:
         now_time = now
 
-    # Morning OC/2 direction override using the current DTAF snapshot.
-    # Master liquidation, cooldown, and entry-time restrictions still take precedence.
-    if ENTRY_START <= now_time < MORNING_OVERRIDE_END:
-        try:
-            _, direction = get_morning_direction()
-            direction = str(direction).upper().strip()
-            entry_sig = {"UP": "BUY", "DOWN": "SELL"}.get(direction, "NONE")
-            exit_sig = {"UP": "BULL", "DOWN": "BEAR"}.get(direction, "NONE")
-        except Exception as exc:
-            print(f"⚠️ Morning direction override unavailable: {exc}")
-            entry_sig, exit_sig = "NONE", "NONE"
-        print(f"⏱️ MORNING OVERRIDE | IN: {entry_sig} | OUT: {exit_sig}")
-        return _apply_new_cycle_cutoff(entry_sig, exit_sig, now_time)
+    # OCC3 direction is the primary IN/OUT source throughout the session.
+    # Keep the existing morning direction calculation unchanged.
+    try:
+        _, direction = get_morning_direction()
+        direction = str(direction).upper().strip()
+        entry_sig = {"UP": "BUY", "DOWN": "SELL"}.get(direction, "NONE")
+        exit_sig = {"UP": "BULL", "DOWN": "BEAR"}.get(direction, "NONE")
+    except Exception as exc:
+        print(f"⚠️ OCC3 direction unavailable: {exc}")
+        entry_sig, exit_sig = "NONE", "NONE"
 
-    if df is None:
-        from sysdtafpxy import fetch_yf_data
-        df = fetch_yf_data()
-
-    raw_entry, raw_exit = get_market_signals(df)
-    raw_entry = str(raw_entry).upper().strip()
-    raw_exit = str(raw_exit).upper().strip()
-
-    # Additional IN trigger: opposite raw direction versus current OUT state.
-    # Leave OUT unchanged.
-    if raw_exit in {"BULL", "BEAR"}:
-        try:
-            _, raw_direction = detect_raw_direction(df)
-            raw_direction = str(raw_direction).upper().strip()
-            if raw_exit == "BULL" and raw_direction == "DOWN":
-                raw_entry = "BUY"
-            elif raw_exit == "BEAR" and raw_direction == "UP":
-                raw_entry = "SELL"
-        except Exception as exc:
-            print(f"⚠️ IN direction cross-check unavailable: {exc}")
-
-    # Breakout signals take priority over existing IN signals after 09:30.
-    # BOS labels remain MBUY/MSELL until its configured morning end (10:10),
-    # so include those labels to avoid a 09:30-10:10 priority gap.
-    # OUT and all risk/time gates remain unchanged.
+    # After 09:30, BOS has priority for IN only; OUT remains OCC3-driven.
     if now_time >= MORNING_OVERRIDE_END:
+        if df is None:
+            from sysdtafpxy import fetch_yf_data
+            df = fetch_yf_data()
         try:
             _, bos_signal = get_bos_bar(df)
             bos_signal = str(bos_signal).upper().strip()
             if bos_signal in {"NBUY", "MBUY"}:
-                raw_entry = "BUY"
+                entry_sig = "BUY"
             elif bos_signal in {"NSELL", "MSELL"}:
-                raw_entry = "SELL"
+                entry_sig = "SELL"
         except Exception as exc:
             print(f"⚠️ Breakout entry priority unavailable: {exc}")
-
-    entry_sig = raw_entry if raw_entry in {"BUY", "SELL"} else "NONE"
-    exit_sig = raw_exit if raw_exit in {"BULL", "BEAR", "SIDE"} else "NONE"
 
     print(f"⏱️ IN: {entry_sig} | OUT: {exit_sig}")
     return _apply_new_cycle_cutoff(entry_sig, exit_sig, now_time)
