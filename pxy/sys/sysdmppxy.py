@@ -5,6 +5,7 @@ import warnings
 import tempfile
 import pandas as pd
 import yfinance as yf
+from sysdthapxy import transform_dtha_ohlc
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from syscnfgpxy import (
@@ -77,7 +78,7 @@ def _run_independent_engine_production():
                 ) as temp_file:
                     temp_export_path = temp_file.name
 
-                raw_data.to_json(
+                transform_dtha_ohlc(raw_data).to_json(
                     temp_export_path,
                     date_format="iso",
                     orient="split",
@@ -88,9 +89,9 @@ def _run_independent_engine_production():
                 if temp_export_path and os.path.exists(temp_export_path):
                     os.remove(temp_export_path)
 
-            print("📦 RAW JSON DUMP SUCCESS (IST)")
+            print("📦 DTHA JSON DUMP SUCCESS (IST)")
             
-            processed_df = raw_data.copy()
+            processed_df = transform_dtha_ohlc(raw_data)
             print(f"✅ ENGINE SUCCESS | Session Rows Saved: {len(processed_df)}")
             return processed_df
             
