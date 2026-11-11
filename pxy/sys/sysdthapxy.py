@@ -210,7 +210,7 @@ def get_stma_signals(df, include_running=None):
     candles = df if include_running else df.iloc[:-1]
     if len(candles) < SYSSMAPXY_TSMA_PERIOD + 1:
         return neutral
-    raw = candles.loc[:, list(required)].apply(pd.to_numeric, errors="coerce")
+    raw = transform_dtha_ohlc(candles).loc[:, list(required)].apply(pd.to_numeric, errors="coerce")
     if not np.isfinite(raw.to_numpy(dtype=float)).all():
         return neutral
 
