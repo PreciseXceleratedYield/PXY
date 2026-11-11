@@ -27,6 +27,8 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     if any(column not in df.columns for column in required):
         return df.copy()
 
+    if df.attrs.get("pxy_dtha_mode") == mode:
+        return df.copy()
     out = df.copy()
     raw_open = pd.to_numeric(out["Open"], errors="coerce").to_numpy(dtype=float)
     raw_high = pd.to_numeric(out["High"], errors="coerce").to_numpy(dtype=float)
@@ -34,20 +36,25 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
     if mode == "RAW":
+        out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_mode"] = mode
         return out
 
     if mode == "OC2":
         out["Close"] = (raw_open + raw_close) / 2.0
+        out.attrs["pxy_dtha_mode"] = mode
         return out
 
     if mode == "OCC3":
         out["Close"] = (raw_open + 2.0 * raw_close) / 3.0
+        out.attrs["pxy_dtha_mode"] = mode
         return out
 
     if mode == "OHLC4":
         out["Close"] = (
             raw_open + raw_high + raw_low + raw_close
         ) / 4.0
+        out.attrs["pxy_dtha_mode"] = mode
         return out
 
     if mode == "HYPR":
@@ -59,6 +66,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         )
         out["Open"] = raw_close
         out["Close"] = hyper_close
+        out.attrs["pxy_dtha_mode"] = mode
         return out
 
     # Standard Heikin-Ashi candles.
@@ -80,6 +88,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     out["High"] = ha_high
     out["Low"] = ha_low
     out["Close"] = ha_close
+    out.attrs["pxy_dtha_mode"] = mode
     return out
 
 
