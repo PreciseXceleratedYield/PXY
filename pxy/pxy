@@ -70,15 +70,15 @@ while true; do
     draw_border
     echo "            PXY ENGINE CONSOLE            "
     draw_border
+    echo "x) 🚪 Exit    - Close Menu"
     echo "u) 🔄 Updt    - Update Code"
-    echo "s) ✅ Strt    - Start Engine"
     echo "k) 🚧 Stop    - Stop Engine"
+    echo "n) 🔗 Conn    - SSH Connect"
+    echo "s) ✅ Strt    - Start Engine"
     echo "t) 💰 Trde    - Trade Control"
     echo "m) 📺 Smon    - System Monitor"
     echo "c) 🧰 Ctrl    - System Control"
     echo "g) 📡 Tlgr    - Telegram Alerts"
-    echo "n) 🔗 Conn    - SSH Connect"
-    echo "x) 🚪 Exit    - Close Menu"
     draw_border
     read -p "Select option: " OPTION
     
