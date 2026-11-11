@@ -4,6 +4,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import syscnfgpxy
+from sysdthapxy import transform_dtha_ohlc
 from syssmapxy import calculate_moving_average, get_sma_signal
 from systsmpxy import calculate_tsma, get_tsma
 from sysstrnpxy import calculate_supertrend as calculate_st, get_market_trend
@@ -33,8 +34,8 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
             return df.copy()
     if df.empty:
         return df
-    # Filter unusable candles before recursive SuperTrend and other indicators.
-    df = df.copy()
+    # DTHA is the only candle transformation authority.
+    df = transform_dtha_ohlc(df)
     required_ohlc = ("Open", "High", "Low", "Close")
     for column in required_ohlc:
         df[column] = pd.to_numeric(df[column], errors="coerce")
