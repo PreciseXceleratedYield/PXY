@@ -83,6 +83,11 @@ def main():
         if liquidation_pending():
             print(f"{Fore.YELLOW}🛑 Master risk liquidation initiated this cycle; fresh entry blocked.")
             return
+        # Fail closed for new entries if neither Yahoo nor the validated
+        # DTAF futures fallback produced a fresh candle snapshot.
+        if not isinstance(data, dict) or data.get("market_data_fresh") is not True or data.get("market_data_available") is not True:
+            print(f"{Fore.YELLOW}⏳ Fresh entry blocked: market candle data unavailable or stale.")
+            return
         entry_signal = data.get("entry")
 
         if not entry_signal_valid(entry_signal):
