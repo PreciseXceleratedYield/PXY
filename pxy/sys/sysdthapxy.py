@@ -128,9 +128,9 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
 
 def get_strw_signals(df, include_running=None):
-    """Return STRW IN/OUT from raw close direction and configured SuperTrend period and factor.
+    """Return STRW IN/OUT from OC/2 midpoint direction and raw-OHLC SuperTrend.
 
-    IN suppresses entries on SuperTrend flips, otherwise uses ST/raw disagreement.\n    Both ST and direction use the same raw candles. A flat close or invalid price produces NONE/SIDE.
+    IN suppresses entries on SuperTrend flips, otherwise uses ST/OC2 disagreement.\n    SuperTrend remains on raw candles; flat midpoint change gives NONE/SIDE.
     """
     from sysstrnpxy import _compute_single_st
 
@@ -152,7 +152,8 @@ def get_strw_signals(df, include_running=None):
         return neutral
 
     closes = raw["Close"].to_numpy(dtype=float)
-    change = closes[-1] - closes[-2]
+    midpoint = (raw["Open"].to_numpy(dtype=float) + closes) / 2.0
+    change = midpoint[-1] - midpoint[-2]
     if change == 0:
         return neutral
     raw_direction = "BULL" if change > 0 else "BEAR"
