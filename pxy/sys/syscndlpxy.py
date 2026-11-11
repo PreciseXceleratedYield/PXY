@@ -2,6 +2,7 @@
 
 from colorama import Fore, Style, init, deinit
 from sysdtafpxy import fetch_yf_data
+from sysdthapxy import transform_dtha_ohlc
 
 init(autoreset=True)
 
@@ -16,7 +17,7 @@ def get_latest_candle(df=None):
     if df is None or df.empty or len(df) < 1:
         return None
 
-    row = df.iloc[-1]
+    row = transform_dtha_ohlc(df).iloc[-1]
 
     return {
         "open": float(row["Open"]),
