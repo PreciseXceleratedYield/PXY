@@ -16,9 +16,9 @@ from sysdtafpxy import fetch_yf_data
 
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     """Transform raw market OHLC once using one of six pure candle modes."""
-    valid_modes = {"RAW", "OC2", "OHLC4", "HKIN", "HYPR"}
+    valid_modes = {"RAW", "OC2", "OCC3", "OHLC4", "HKIN", "HYPR"}
     if mode not in valid_modes:
-        raise ValueError("DTHA mode must be RAW, OC2, OHLC4, HKIN, or HYPR.")
+        raise ValueError("DTHA mode must be RAW, OC2, OCC3, OHLC4, HKIN, or HYPR.")
 
     if df is None or df.empty:
         return df
@@ -38,6 +38,10 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     if mode == "OC2":
         out["Close"] = (raw_open + raw_close) / 2.0
+        return out
+
+    if mode == "OCC3":
+        out["Close"] = (raw_open + 2.0 * raw_close) / 3.0
         return out
 
     if mode == "OHLC4":
