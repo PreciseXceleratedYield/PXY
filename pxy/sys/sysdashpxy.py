@@ -126,7 +126,8 @@ def get_full_snapshot(monitor=False):
 
     # ===== PRICE & DIRECTION VECTORS =====
     price, direction = detect_raw_direction(master_df)
-    result["price"] = safe_int(price)
+    # Display the actual NIFTY market price, not synthetic DTHA Close.
+    result["price"] = safe_int(master_df["Close"].iloc[-1])
     result["direction"] = direction if direction else "NONE"
 
     # ===== SUPERTREND PROFILES =====
