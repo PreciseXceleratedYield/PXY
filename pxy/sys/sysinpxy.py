@@ -8,7 +8,7 @@ from syscnfgpxy import (
 )
 from sysdtafpxy import fetch_yf_data
 from sysdirpxy import detect_raw_direction
-from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states, get_strw_signals, get_stma_signals
+from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states, get_supr_signals, get_stma_signals
 
 
 def get_signal(df=None):
@@ -36,8 +36,8 @@ def get_signal(df=None):
                 return {"UP": "SELL", "DOWN": "BUY"}.get(raw_direction, "NONE")
             return "NONE"
 
-        if SYSINPXY_SIGNAL_MODE == "STRW":
-            return get_strw_signals(df)[0]
+        if SYSINPXY_SIGNAL_MODE == "SUPR":
+            return get_supr_signals(df)[0]
 
         if SYSINPXY_SIGNAL_MODE != "TSMA":
             return "NONE"
