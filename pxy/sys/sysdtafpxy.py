@@ -128,53 +128,6 @@ def _read_nifty_futures_price(max_age_seconds=None):
     return price
 
 
-def _read_futures_minute_candles(target_rows):
-    """Build a complete FUT-only 1m OHLC window from timestamped LTP samples."""
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exe", "run", "nftfut.json")
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            records = json.load(handle)
-    except (OSError, ValueError, TypeError):
-        return None
-    if not isinstance(records, list):
-        records = [records]
-    rows = []
-    now = pd.Timestamp.now(tz=TIMEZONE)
-    for record in records:
-        if not isinstance(record, dict):
-            continue
-        try:
-            stamp = pd.Timestamp(record.get("timestamp"))
-            price = float(record.get("price"))
-            if stamp.tzinfo is None or not math.isfinite(price) or price <= 0:
-                continue
-            stamp = stamp.tz_convert(TIMEZONE)
-            if stamp > now or (now - stamp).total_seconds() > 86400:
-                continue
-            rows.append((stamp, price))
-        except (TypeError, ValueError, OverflowError):
-            continue
-    if not rows:
-        return None
-    quotes = pd.DataFrame(rows, columns=["timestamp", "price"])
-    quotes = quotes.sort_values("timestamp").drop_duplicates("timestamp", keep="last")
-    quotes = quotes.set_index("timestamp")["price"]
-    candles = quotes.resample("1min").ohlc()
-    candles.columns = ["Open", "High", "Low", "Close"]
-    candles = candles.dropna(subset=["Open", "High", "Low", "Close"])
-    if len(candles) < target_rows:
-        return None
-    candles = candles.tail(target_rows)
-    gaps = candles.index.to_series().diff().iloc[1:]
-    if not gaps.eq(pd.Timedelta(minutes=1)).all():
-        return None
-    if (now - quotes.index[-1]).total_seconds() > SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS:
-        return None
-    candles.attrs["source_ticker"] = "NIFTY_FUT"
-    candles.attrs["data_fallback"] = False
-    return candles
-
-
 def _blend_stale_yahoo_futures_momentum(df, interval, max_age_seconds):
     """Use the literal 50/50 index/futures average when Yahoo 1m data is stale.
 
@@ -239,12 +192,6 @@ def _fetch_yf_data_production(
 ):
     """Fetch raw OHLC; retain futures-only fallback when Yahoo is unavailable."""
 
-    # Never mix FUT and NIFTY in the same indicator window.
-    if interval == "1m" and not FORCE_NIFTY_FUT:
-        futures_candles = _read_futures_minute_candles(target_rows)
-        if futures_candles is not None:
-            return futures_candles
-
     df = pd.DataFrame()
     buffer_rows = target_rows + 5
 
@@ -289,62 +236,11 @@ def _fetch_yf_data_production(
     futures_price = _read_nifty_futures_price()
 
     # ======================================================================
-    # FALLBACK: synthesize rows from the futures price if Yahoo data
-    # is unavailable or insufficient.
-    # ======================================================================
+    # YF-only indicator candles: never manufacture historical OHLC from
+    # a single futures quote. Return unavailable if YF has insufficient data.
     if df.empty or len(df) < buffer_rows:
-
-        if FORCE_NIFTY_FUT:
-            print(
-                "Forced source: using local nftfut.json fallback."
-            )
-
-        else:
-            print(
-                "Warning: yfinance data stream unavailable. "
-                "Using nftfut.json futures fallback."
-            )
-
-        if futures_price is not None:
-            current_time = pd.Timestamp.now(tz=TIMEZONE)
-
-            mock_data = {
-                "Open": [futures_price] * target_rows,
-                "High": [futures_price] * target_rows,
-                "Low": [futures_price] * target_rows,
-                "Close": [futures_price] * target_rows,
-                "Volume": [0.0] * target_rows,
-            }
-
-            time_indices = [
-                current_time - pd.Timedelta(minutes=i)
-                for i in reversed(range(target_rows))
-            ]
-
-            fallback_df = pd.DataFrame(
-                mock_data,
-                index=time_indices,
-            )
-
-
-            fallback_df.attrs["data_fallback"] = True
-
-            return fallback_df
-
-        else:
-            if FORCE_NIFTY_FUT:
-                print(
-                    "Critical Fault: local nftfut.json "
-                    "fallback unavailable."
-                )
-
-            else:
-                print(
-                    "Critical Fault: yfinance and local json "
-                    "storage pools exhausted."
-                )
-
-            return pd.DataFrame()
+        print("Warning: Yahoo NIFTY candle history unavailable or insufficient.")
+        return pd.DataFrame()
 
     # Normalize the index to the configured timezone.
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -356,10 +252,8 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # Keep Yahoo candles unchanged while fresh; when delayed, add a single
-    # literal 50/50 Yahoo-close/futures-price synthetic signal candle.
+    # Indicators receive only unmodified Yahoo NIFTY OHLC candles.
     processed_df = transform_market_data(df)
-    # NIFTY fallback remains a whole-series source, not a blended candle.
 
     # Publish the two actual quotes already read above; never infer either
     # from transformed candles or perform an extra market-data request.
