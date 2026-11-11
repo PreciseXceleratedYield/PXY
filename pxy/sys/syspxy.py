@@ -62,22 +62,36 @@ def get_all_data():
     )
 
     # -------- PRICE LOGIC (DISPLAY/EXECUTION SNAPSHOT ONLY) --------
-    # Reuse the existing timestamp-validated Kotak Futures feed; no new API call.
-    # Average Futures and NIFTY index when both exist; otherwise use the available source.
-    # This changes only the published price, never the OHLC or indicators.
+    # Prefer a timestamp-validated futures quote. Never blend futures and index.
+    # When futures is stale, use a fresh raw Yahoo index quote plus the
+    # same-day YAHOO-source DTAF continuity offset (not a FUTURES offset).
+    # This does not change signal candles or indicator calculations.
     futures_price = _read_nifty_futures_price(max_age_seconds=5 * 60)
-    index_price = core.get("price") if core.get("market_data_available", False) else None
-    try:
-        index_price = float(index_price)
-        if not math.isfinite(index_price) or index_price <= 0:
-            index_price = None
-    except (TypeError, ValueError, OverflowError):
-        index_price = None
-    # Blend both available prices; otherwise use whichever valid source remains.
-    if futures_price is not None and index_price is not None:
-        final_price = (futures_price + index_price) / 2.0
-    else:
-        final_price = futures_price if futures_price is not None else index_price
+    final_price = futures_price
+    if final_price is None:
+        quote_path = Path(__file__).resolve().parent.parent / "web" / "webprcpxy.json"
+        state_path = Path(__file__).resolve().parent / "exe" / "run" / "dtaf_source_state.json"
+        try:
+            quote = json.loads(quote_path.read_text(encoding="utf-8"))
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            yahoo_time = datetime.fromisoformat(quote["index_time"])
+            now = datetime.now(SYSCNFGPXY_TIMEZONE)
+            yahoo_age = (now - yahoo_time.astimezone(SYSCNFGPXY_TIMEZONE)).total_seconds()
+            yahoo_price = float(quote["index"])
+            offset = float(state["offset"])
+            if (
+                yahoo_time.tzinfo is not None
+                and 0 <= yahoo_age <= 60
+                and state.get("day") == now.date().isoformat()
+                and state.get("source") == "YAHOO"
+                and math.isfinite(yahoo_price) and yahoo_price > 0
+                and math.isfinite(offset)
+                and math.isfinite(yahoo_price + offset)
+                and yahoo_price + offset > 0
+            ):
+                final_price = yahoo_price + offset
+        except (OSError, KeyError, ValueError, TypeError, OverflowError, AttributeError):
+            pass
 
     # Display SMA50 when trading filter is NONE; otherwise show the selected filter.
     # This display fallback does not enable an entry filter.
