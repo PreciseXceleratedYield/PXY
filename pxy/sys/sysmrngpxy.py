@@ -1,11 +1,12 @@
 # sysmrngpxy.py
-"""Morning-only OCC3 candle direction, independent of configured DTHA mode."""
+"""Morning-only direction from the centrally selected DTHA candles."""
 
 import pandas as pd
+from sysdthapxy import transform_dtha_ohlc
 
 
 def get_morning_direction():
-    """Compare the last two (Open + 2*Close)/3 candle values.
+    """Compare the last two DTHA-transformed candle close values.
 
     Returns (latest_transformed_close, UP/DOWN/NONE). The input is never mutated.
     The running candle is included, matching the existing morning override.
@@ -15,10 +16,7 @@ def get_morning_direction():
     if df is None or len(df) < 2 or not {"Open", "Close"}.issubset(df.columns):
         return None, "NONE"
 
-    candles = df.copy()
-    opens = pd.to_numeric(candles["Open"], errors="coerce")
-    closes = pd.to_numeric(candles["Close"], errors="coerce")
-    candles["Close"] = (opens + 2.0 * closes) / 3.0
+    candles = transform_dtha_ohlc(df)
     if candles["Close"].iloc[-2:].isna().any():
         return None, "NONE"
     previous_close = candles["Close"].iloc[-2]
