@@ -10,6 +10,7 @@ from sysdtafpxy import fetch_yf_data, fetch_yf_data_for_monitor
 from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS,
+    SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS,
     SYSCNFGPXY_MARKET_OPEN,
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_TRADING_DAY_END,
@@ -56,7 +57,10 @@ def get_full_snapshot(monitor=False):
 
     master_df = chart_source_df.tail(SYSDTAFPXY_DEFAULT_TARGET_ROWS).copy()
     is_futures_fallback = bool(master_df.attrs.get("data_fallback", False))
+    blended_fallback = bool(master_df.attrs.get("futures_price_average_fallback", False))
     result["market_data_available"] = not is_futures_fallback
+    result["market_data_source"] = "YAHOO_FUTURES_BLEND" if blended_fallback else "YAHOO"
+    result["market_data_fallback"] = blended_fallback
 
     # Yahoo timestamps are candle-start times. Measure the age in configured
     # IST; this is warning-only and deliberately does not gate any signal.
@@ -75,14 +79,14 @@ def get_full_snapshot(monitor=False):
         <= market_time
         < SYSCNFGPXY_TRADING_DAY_END
     )
-    candle_is_stale = (
-        is_exchange_session
-        and not is_futures_fallback
-        and (
-            candle_age_seconds < 0
-            or candle_age_seconds > SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS
-        )
-    )
+    # Freshness is an execution property, not just a session warning.
+    # The synthetic fallback is accepted only when its 60-second futures
+    # freshness check succeeded in DTAF, and its timestamp remains current.
+    max_age = (SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS if blended_fallback
+               else SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS)
+    data_fresh = (not is_futures_fallback and 0 <= candle_age_seconds <= max_age)
+    candle_is_stale = is_exchange_session and not data_fresh
+    result["market_data_fresh"] = bool(data_fresh)
     result["market_data_timestamp"] = candle_timestamp.isoformat()
     result["market_data_age_seconds"] = round(candle_age_seconds, 1)
     result["market_data_stale"] = bool(candle_is_stale)
