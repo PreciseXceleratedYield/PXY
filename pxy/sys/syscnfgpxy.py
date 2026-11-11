@@ -385,7 +385,7 @@ EXEAGTPXY_ABS_CAP = 77.0
 EXEAGTPXY_FORCE_DEFAULT = 1.2
 
 # Limit or threshold governing max investment.
-EXEAMSPXY_MAX_INVESTMENT = 40000.0
+EXEAMSPXY_MAX_INVESTMENT = 50000.0
 # Limit or threshold governing max lgt loss.
 EXEAMSPXY_MAX_LGT_LOSS = 77.0
 # Broker order request field: order exchange segment.
