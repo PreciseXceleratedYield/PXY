@@ -14,6 +14,7 @@ from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS,
+    SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS,
     SYSDTAFPXY_FALLBACK_PERIODS,
     SYSDTAFPXY_FORCE_NIFTY_FUT,
 )
@@ -286,8 +287,15 @@ def _fetch_yf_data_production(
     except (OSError, ValueError, TypeError, OverflowError):
         pass
 
+    # Preserve Yahoo history; append one synthetic current candle only when
+    # Yahoo is stale and the futures quote passes its 60-second receipt-age gate.
+    processed_df = _blend_stale_yahoo_futures_momentum(
+        processed_df, interval, SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS
+    )
+    fallback_active = bool(processed_df.attrs.get("futures_price_average_fallback", False))
     processed_df = processed_df.tail(target_rows)
     processed_df.attrs["data_fallback"] = False
+    processed_df.attrs["futures_price_average_fallback"] = fallback_active
 
     return processed_df
 
