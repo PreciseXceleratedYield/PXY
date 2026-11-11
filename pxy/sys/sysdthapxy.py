@@ -15,18 +15,10 @@ from sysdtafpxy import fetch_yf_data
 
 
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
-    """Return a copy of OHLC data transformed using the selected DTHA mode.
-
-    RAW2, OCC3, and RAW4 replace Close with the corresponding candle average.\n    STRW uses raw OHLC candles for both direction and SuperTrend.
-    HYPR preserves the former DTAF mode-0 transformation.
-    TSMA retains the existing four-component synthetic close.\n    TSCL blends TSMA(Close) and actual Close equally, with prior actual Close as Open.
-    HKIN applies the standard recursive Heikin-Ashi transformation.
-    """
-    valid_modes = {"RAW0", "RAW2", "OCC3", "HKIN", "RAW4", "HYPR", "TSMA", "TSCL", "STRW", "STMA"}
+    """Transform raw market OHLC once using one of six pure candle modes."""
+    valid_modes = {"RAW0", "RAW2", "OCC3", "RAW4", "HKIN", "HYPR"}
     if mode not in valid_modes:
-        raise ValueError(
-            "DTHA mode must be RAW0, RAW2, OCC3, HKIN, RAW4, HYPR, TSMA, TSCL, STRW, or STMA."
-        )
+        raise ValueError("DTHA mode must be RAW0, RAW2, OCC3, RAW4, HKIN, or HYPR.")
 
     if df is None or df.empty:
         return df
@@ -41,7 +33,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
-    if mode in {"RAW0", "STMA", "STRW"}:
+    if mode == "RAW0":
         return out
 
     if mode == "OCC3":
@@ -69,42 +61,6 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Close"] = hyper_close
         return out
 
-    if mode == "TSCL":
-        tsma_close = calculate_moving_average(
-            pd.Series(raw_close, index=out.index),
-            period=SYSSMAPXY_TSMA_PERIOD,
-            variant="TSMA",
-        ).to_numpy(dtype=float)
-        candle_open = np.concatenate(([raw_open[0]], raw_close[:-1]))
-        candle_close = (tsma_close + raw_close) / 2.0
-        out["Open"] = candle_open
-        out["Close"] = candle_close
-        out["High"] = np.maximum(candle_open, candle_close)
-        out["Low"] = np.minimum(candle_open, candle_close)
-        return out
-
-    if mode == "TSMA":
-        tsma_open = calculate_moving_average(
-            pd.Series(raw_open, index=out.index),
-            period=SYSSMAPXY_TSMA_PERIOD,
-            variant="TSMA",
-        ).to_numpy(dtype=float)
-        tsma_close = calculate_moving_average(
-            pd.Series(raw_close, index=out.index),
-            period=SYSSMAPXY_TSMA_PERIOD,
-            variant="TSMA",
-        ).to_numpy(dtype=float)
-        # Construct each candle independently from its actual and TSMA values.
-        candle_open = (tsma_open + raw_open) / 2.0
-        blended_close = (tsma_close + raw_close) / 2.0
-        # Final close is the average of the synthetic open and blended close.
-        candle_close = (candle_open + blended_close) / 2.0
-        out["Open"] = candle_open
-        out["Close"] = candle_close
-        out["High"] = np.maximum(candle_open, candle_close)
-        out["Low"] = np.minimum(candle_open, candle_close)
-        return out
-
     # Standard Heikin-Ashi candles.
     ha_close = (
         raw_open + raw_high + raw_low + raw_close
@@ -128,9 +84,9 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
 
 def get_strw_signals(df, include_running=None):
-    """Return STRW IN/OUT from OC/2 midpoint direction and raw-OHLC SuperTrend.
+    """Return STRW IN/OUT from DTHA-transformed candles and SuperTrend.
 
-    IN suppresses entries on SuperTrend flips, otherwise uses ST/OC2 disagreement.\n    SuperTrend remains on raw candles; flat midpoint change gives NONE/SIDE.
+    IN suppresses entries on SuperTrend flips, otherwise uses ST/candle disagreement.\n    Flat transformed-close change gives NONE/SIDE.
     """
     from sysstrnpxy import _compute_single_st
 
@@ -145,15 +101,14 @@ def get_strw_signals(df, include_running=None):
     candles = df if include_running else df.iloc[:-1]
     if len(candles) < 2:
         return neutral
-    raw = transform_dtha_ohlc(candles, mode="STRW").loc[:, list(required)].copy()
+    raw = transform_dtha_ohlc(candles).loc[:, list(required)].copy()
     for name in required:
         raw[name] = pd.to_numeric(raw[name], errors="coerce")
     if not np.isfinite(raw.to_numpy(dtype=float)).all():
         return neutral
 
     closes = raw["Close"].to_numpy(dtype=float)
-    midpoint = (raw["Open"].to_numpy(dtype=float) + closes) / 2.0
-    change = midpoint[-1] - midpoint[-2]
+    change = closes[-1] - closes[-2]
     if change == 0:
         return neutral
     raw_direction = "BULL" if change > 0 else "BEAR"
