@@ -32,10 +32,10 @@ def _dtha_ohlc_signature(df):
 
 
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
-    """Transform raw market OHLC once using one of six pure candle modes."""
-    valid_modes = {"RAW", "OC2", "OCC3", "OHLC4", "HKIN", "HYPR"}
+    """Transform raw market OHLC once using one of seven pure candle modes."""
+    valid_modes = {"RAW", "OC2", "LH2", "OCC3", "OHLC4", "HKIN", "HYPR"}
     if mode not in valid_modes:
-        raise ValueError("DTHA mode must be RAW, OC2, OCC3, OHLC4, HKIN, or HYPR.")
+        raise ValueError("DTHA mode must be RAW, OC2, LH2, OCC3, OHLC4, HKIN, or HYPR.")
 
     if df is None or df.empty:
         return df
@@ -83,6 +83,13 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     if mode == "OC2":
         out["Close"] = (raw_open + raw_close) / 2.0
+        out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
+        return out
+
+    if mode == "LH2":
+        out["Close"] = (raw_low + raw_high) / 2.0
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
