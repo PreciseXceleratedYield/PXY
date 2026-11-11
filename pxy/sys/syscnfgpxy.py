@@ -78,7 +78,7 @@ RUNLDGRPXY_TELEGRAM_TIMEOUT_SECONDS = 5
 # Runtime setting for layout width.
 RUNLDGRPXY_LAYOUT_WIDTH = 30
 # Limit or threshold governing price history limit.
-RUNNFTFUTPXY_PRICE_HISTORY_LIMIT = 50
+RUNNFTFUTPXY_PRICE_HISTORY_LIMIT = 1200
 # Polling or execution cadence for refresh seconds.
 RUNNFTFUTPXY_REFRESH_SECONDS = 5
 if (
