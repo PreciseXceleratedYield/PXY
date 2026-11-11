@@ -166,20 +166,20 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 # DTHA transforms candles consumed by IN/OUT; STMT evaluates the selected candles independent of confirmation mode.
 # ================================================================
 # Switch or algorithm selection for candle mode.
-SYSDTHAPXY_CANDLE_MODE = "RAW2"
-if SYSDTHAPXY_CANDLE_MODE not in {"RAW0", "RAW2", "OCC3", "HKIN", "RAW4", "HYPR"}:
+SYSDTHAPXY_CANDLE_MODE = "OC2"
+if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HKIN", "OHLC4", "HYPR"}:
     raise ValueError(
-        "SYSDTHAPXY_CANDLE_MODE must be RAW0, RAW2, OCC3, HKIN, RAW4, or HYPR."
+        "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HKIN, OHLC4, or HYPR."
     )
 
 # Switch or algorithm selection for signal mode.
-SYSINPXY_SIGNAL_MODE = "STRW"
+SYSINPXY_SIGNAL_MODE = "SUPR"
 # Switch or algorithm selection for signal mode.
-SYSOUTPXY_SIGNAL_MODE = "STRW"
-if SYSINPXY_SIGNAL_MODE not in {"TSMA", "STRW"}:
-    raise ValueError("SYSINPXY_SIGNAL_MODE must be TSMA or STRW.")
-if SYSOUTPXY_SIGNAL_MODE not in {"TSMA", "STRW"}:
-    raise ValueError("SYSOUTPXY_SIGNAL_MODE must be TSMA or STRW.")
+SYSOUTPXY_SIGNAL_MODE = "SUPR"
+if SYSINPXY_SIGNAL_MODE not in {"TSMA", "SUPR"}:
+    raise ValueError("SYSINPXY_SIGNAL_MODE must be TSMA or SUPR.")
+if SYSOUTPXY_SIGNAL_MODE not in {"TSMA", "SUPR"}:
+    raise ValueError("SYSOUTPXY_SIGNAL_MODE must be TSMA or SUPR.")
 # Controls inclusion of the forming candle in DTHA analyses.
 SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
