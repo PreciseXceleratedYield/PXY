@@ -143,6 +143,37 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     return out
 
 
+
+def export_dtha_json(df, output_path, *, orient="split", date_format="iso"):
+    """Publish DTHA candle OHLC as JSON; never load JSON back into DTHA.
+
+    Keep the caller's existing filename and pandas JSON layout. The caller
+    supplies raw DTAF candles or an already-marked DTHA frame.
+    """
+    import os
+    import tempfile
+
+    if df is None or df.empty:
+        return None
+    candles = transform_dtha_ohlc(df)
+    directory = os.path.dirname(os.path.abspath(output_path))
+    os.makedirs(directory, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=directory,
+            prefix=".dtha-", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = handle.name
+        candles.to_json(temporary, date_format=date_format, orient=orient)
+        os.replace(temporary, output_path)
+        temporary = None
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.unlink(temporary)
+    return candles
+
+
 def get_supr_signals(df, include_running=None):
     """Return SUPR IN/OUT from DTHA-transformed candles and SuperTrend.
 
