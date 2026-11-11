@@ -16,9 +16,9 @@ from sysdtafpxy import fetch_yf_data
 
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     """Transform raw market OHLC once using one of six pure candle modes."""
-    valid_modes = {"RAW0", "RAW2", "OCC3", "RAW4", "HKIN", "HYPR"}
+    valid_modes = {"RAW", "OC2", "OHLC4", "HKIN", "HYPR"}
     if mode not in valid_modes:
-        raise ValueError("DTHA mode must be RAW0, RAW2, OCC3, RAW4, HKIN, or HYPR.")
+        raise ValueError("DTHA mode must be RAW, OC2, OHLC4, HKIN, or HYPR.")
 
     if df is None or df.empty:
         return df
@@ -33,18 +33,14 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
-    if mode == "RAW0":
+    if mode == "RAW":
         return out
 
-    if mode == "OCC3":
-        out["Close"] = (raw_open + 2.0 * raw_close) / 3.0
-        return out
-
-    if mode == "RAW2":
+    if mode == "OC2":
         out["Close"] = (raw_open + raw_close) / 2.0
         return out
 
-    if mode == "RAW4":
+    if mode == "OHLC4":
         out["Close"] = (
             raw_open + raw_high + raw_low + raw_close
         ) / 4.0
@@ -83,8 +79,8 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     return out
 
 
-def get_strw_signals(df, include_running=None):
-    """Return STRW IN/OUT from DTHA-transformed candles and SuperTrend.
+def get_supr_signals(df, include_running=None):
+    """Return SUPR IN/OUT from DTHA-transformed candles and SuperTrend.
 
     IN suppresses entries on SuperTrend flips, otherwise uses ST/candle disagreement.\n    Flat transformed-close change gives NONE/SIDE.
     """
