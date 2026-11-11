@@ -164,7 +164,7 @@ def get_full_snapshot(monitor=False):
     result["day_candle"] = get_day_candle_bar(dtha_master)
 
     # ===== BREAKOUT STRUCTURE (BOS) MATRIX =====
-    bos_bar, _ = get_bos_bar(dtha_master)
+    bos_bar, _ = get_bos_bar(master_df)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
     return result
     
