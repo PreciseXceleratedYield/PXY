@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import syscnfgpxy
-from sysdthapxy import transform_dtha_ohlc
+from sysdthapxy import transform_dtha_ohlc, publish_dtha_json_payload
 from syssmapxy import calculate_moving_average, get_sma_signal
 from systsmpxy import calculate_tsma, get_tsma
 from sysstrnpxy import calculate_supertrend as calculate_st, get_market_trend
@@ -125,26 +125,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file=DEFAULT_CHART_OU
         })
     if not output:
         return None
-    output_dir = os.path.dirname(output_file) or "."
-    os.makedirs(output_dir, exist_ok=True)
-    temporary_file = None
-    try:
-        import tempfile
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=output_dir,
-            prefix=f".{os.path.basename(output_file)}.",
-            suffix=".tmp",
-            delete=False,
-        ) as handle:
-            temporary_file = handle.name
-            json.dump(output, handle, indent=2, allow_nan=False)
-        os.replace(temporary_file, output_file)
-        temporary_file = None
-    finally:
-        if temporary_file and os.path.exists(temporary_file):
-            os.unlink(temporary_file)
+    publish_dtha_json_payload(output, output_file, indent=2)
     return output
 
 
