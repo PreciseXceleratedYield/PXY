@@ -1150,12 +1150,16 @@ function drawChart(candles){
         const bx=x-bodyW/2;
         const r=Math.min(bodyW/2,2);
 
-        // Outline only: keep the chart/grid/indicator lines visible through each body.
+        // No fill whatsoever: the original chart background stays fully visible.
+        // Draw only a subtle, semi-transparent candle-body border.
+        ctx.save();
+        ctx.globalAlpha=0.55;
         ctx.strokeStyle=color;
-        ctx.lineWidth=1.4;
+        ctx.lineWidth=1;
         ctx.beginPath();
         ctx.roundRect(bx,bodyTop,bodyW,bodyH,r);
         ctx.stroke();
+        ctx.restore();
     });
     }
 
