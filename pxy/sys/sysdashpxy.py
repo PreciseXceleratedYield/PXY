@@ -15,7 +15,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TRADING_DAY_END,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
 )
-from sysdthapxy import get_pxy_data, get_signal_depth_analysis
+from sysdthapxy import get_pxy_data, get_signal_depth_analysis, transform_dtha_ohlc
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysdirpxy import detect_raw_direction
 from sysictrpxy import calculate_indicators, get_indicator_signals
@@ -87,17 +87,21 @@ def get_full_snapshot(monitor=False):
     result["market_data_age_seconds"] = round(candle_age_seconds, 1)
     result["market_data_stale"] = bool(candle_is_stale)
 
+    # DTHA transforms candles once; all downstream analytics use these frames.
+    dtha_master = transform_dtha_ohlc(master_df)
+    dtha_chart = transform_dtha_ohlc(chart_source_df)
+
     # Enforce strict single source of truth across downstream layout components
-    result["candle_visual"] = get_candle_visual(df=master_df)
+    result["candle_visual"] = get_candle_visual(df=dtha_master)
 
     # ===== CLOSE MOMENTUM DATA ENGINE =====
-    pxy_close, pxy_open, pxy_color, _ = get_pxy_data(df=master_df)
+    pxy_close, pxy_open, pxy_color, _ = get_pxy_data(df=dtha_master)
     result["ha_close"] = pxy_close
     result["ha_open"] = pxy_open
     result["ha_color"] = pxy_color
 
     # ===== FLIP & TREND STREAK SIGNAL =====
-    signal_depth = get_signal_depth_analysis(df=master_df)
+    signal_depth = get_signal_depth_analysis(df=dtha_master)
     result["hkin_signal"] = signal_depth["signal"]
     result["hkin_past_depth"] = signal_depth["past_depth"]
     result["hkin_ce_depth"] = signal_depth["ce_depth"]
@@ -105,7 +109,7 @@ def get_full_snapshot(monitor=False):
     result["hkin_signal_time"] = signal_depth["signal_candle_time"]
 
     # ===== FORCE (ADX MATRIX) =====
-    force_result = calculate_adx(master_df)
+    force_result = calculate_adx(dtha_master)
     if force_result:
         ce_force, pe_force = force_result
     else:
@@ -114,9 +118,9 @@ def get_full_snapshot(monitor=False):
     result["pe_force"] = pe_force
 
     # ===== ATR & KATR MATRIX VOLATILITY =====
-    atr_series = calculate_atr(master_df)
+    atr_series = calculate_atr(dtha_master)
     atr_val = safe_int(atr_series.iloc[-1] if not atr_series.empty else 0)
-    k_val = safe_int(calculate_dynamic_k(master_df))
+    k_val = safe_int(calculate_dynamic_k(dtha_master))
     result["atr"] = atr_val
     result["katr"] = k_val
 
@@ -126,9 +130,9 @@ def get_full_snapshot(monitor=False):
     result["direction"] = direction if direction else "NONE"
 
     # ===== SUPERTREND PROFILES =====
-    processed_st_df = calculate_indicators(master_df.copy())
-    chart_df = calculate_indicators(chart_source_df.copy())
-    out_chart_source_df = get_out_candles(chart_source_df.copy())
+    processed_st_df = calculate_indicators(dtha_master.copy())
+    chart_df = calculate_indicators(dtha_chart.copy())
+    out_chart_source_df = get_out_candles(dtha_chart.copy())
     out_chart_df = calculate_indicators(out_chart_source_df.copy())
     trend = chart_df['ST_Trend'].iloc[-1] if not chart_df.empty else "NONE"
     line_val = safe_int(chart_df['ST'].iloc[-1] if not chart_df.empty else 0)
@@ -138,11 +142,11 @@ def get_full_snapshot(monitor=False):
     result["sma"] = indicator_signals["sma"]
     result["tsma"] = indicator_signals["tsma"]
     result["df"] = processed_st_df
-    # The web chart displays OUT-mode candles; entry routing keeps raw candles.
+    # Web chart and indicator series use the shared DTHA candles.
     result["chart_df"] = out_chart_df
 
     # ===== DIRECTIONAL POWER MATRIX =====
-    direction_power, ce, pe = get_ce_pe_power(df=master_df)
+    direction_power, ce, pe = get_ce_pe_power(df=dtha_master)
     result["direction_power"] = safe_int(direction_power)
     result["ce_power"] = safe_int(ce)
     result["pe_power"] = safe_int(pe)
@@ -156,10 +160,10 @@ def get_full_snapshot(monitor=False):
     result["exit"] = exit
 
     # ===== DAY CANDLE DATA INTERFACE =====
-    result["day_candle"] = get_day_candle_bar(master_df)
+    result["day_candle"] = get_day_candle_bar(dtha_master)
 
     # ===== BREAKOUT STRUCTURE (BOS) MATRIX =====
-    bos_bar, _ = get_bos_bar(master_df)
+    bos_bar, _ = get_bos_bar(dtha_master)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
     return result
     
