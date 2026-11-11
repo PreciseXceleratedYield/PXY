@@ -85,6 +85,8 @@ def calculate_tgt(
     exit_signal=None,
     opposite_count=0,
     own_count=0,
+    own_worth=0.0,
+    opposite_worth=0.0,
     tsma_state=None,
     is_ce=None,
 ):
@@ -131,8 +133,13 @@ def calculate_tgt(
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
 
         if not is_aligned:
-            # Both-side non-aligned target scales inversely with own lot count.
-            return X / max(1.0, float(own_count))
+            # Both-side non-aligned target follows opposite/own market worth.
+            # Zero or invalid own worth must not produce an infinite target.
+            own = float(own_worth)
+            opposite = float(opposite_worth)
+            if not all(math.isfinite(v) for v in (own, opposite)) or own <= 0 or opposite < 0:
+                return 0.0
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X * opposite / own)
 
         # Aligned positions use the same target formula whether one or both sides are open.
         both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
@@ -243,6 +250,8 @@ def target_price(
             exit_signal=exit_signal,
             opposite_count=pe_count if is_ce else ce_count,
             own_count=ce_count if is_ce else pe_count,
+            own_worth=ce_investment if is_ce else pe_investment,
+            opposite_worth=pe_investment if is_ce else ce_investment,
             tsma_state=row.get("tsma"),
             is_ce=is_ce,
         )
