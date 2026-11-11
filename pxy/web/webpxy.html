@@ -1154,14 +1154,20 @@ function drawChart(candles){
         const bx=x-bodyW/2;
         const r=Math.min(bodyW/2,2);
 
-        // No fill whatsoever: the original chart background stays fully visible.
-        // Draw only a subtle, semi-transparent candle-body border.
+        // Only the last closed candle and the running candle have solid bodies.
+        // All earlier candles retain transparent interiors; indicators draw afterward,
+        // so ST, mirror, FUT and moving-average lines remain in the foreground.
         ctx.save();
+        const bodyColor=candleDirection(c.c,prevClose)==='BULL'?'#00d66b':candleDirection(c.c,prevClose)==='BEAR'?'#ff424a':color;
         ctx.globalAlpha=0.95;
-        ctx.strokeStyle=candleDirection(c.c,prevClose)==='BULL'?'#00d66b':candleDirection(c.c,prevClose)==='BEAR'?'#ff424a':color;
+        ctx.strokeStyle=bodyColor;
         ctx.lineWidth=1.4;
         ctx.beginPath();
         ctx.roundRect(bx,bodyTop,bodyW,bodyH,r);
+        if(i>=n-2){
+            ctx.fillStyle=bodyColor;
+            ctx.fill();
+        }
         ctx.stroke();
         ctx.restore();
     });
