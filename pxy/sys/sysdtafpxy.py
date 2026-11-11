@@ -185,6 +185,79 @@ def _blend_stale_yahoo_futures_momentum(df, interval, max_age_seconds):
     return extended
 
 
+def _blend_available_futures_history(df, interval):
+    """Blend a contiguous trailing window of timestamp-matched FUT/YF candles.
+
+    Align the FUT/spot basis at the boundary before blending, avoiding a
+    synthetic jump between the untouched YF past and the blended recent bars.
+    Never forward-fill FUT quotes or synthesize missing historical candles.
+    """
+    if interval != "1m" or df is None or df.empty:
+        return df
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "exe", "run", "nftfut.json")
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            records = json.load(handle)
+    except (OSError, ValueError, TypeError):
+        return df
+    if not isinstance(records, list):
+        records = [records]
+    now = pd.Timestamp.now(tz=TIMEZONE)
+    samples = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        try:
+            stamp = pd.Timestamp(record.get("timestamp"))
+            price = float(record.get("price"))
+            if stamp.tzinfo is None or not math.isfinite(price) or price <= 0:
+                continue
+            stamp = stamp.tz_convert(TIMEZONE)
+            if stamp > now:
+                continue
+            samples.append((stamp, price))
+        except (ValueError, TypeError, OverflowError):
+            continue
+    if not samples:
+        return df
+    quotes = pd.DataFrame(samples, columns=["timestamp", "price"])
+    quotes = quotes.sort_values("timestamp").drop_duplicates("timestamp", keep="last")
+    if (now - quotes["timestamp"].iloc[-1]).total_seconds() > SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS:
+        return df
+    fut = quotes.set_index("timestamp")["price"].resample("1min").ohlc()
+    fut.columns = ["Open", "High", "Low", "Close"]
+    fut = fut.dropna()
+    # Only blend the most recent consecutive matching bars. A missing minute
+    # breaks the window; old unmatched YF candles remain unchanged.
+    common = df.index.intersection(fut.index)
+    if len(common) < 2 or common[-1] != df.index[-1]:
+        return df
+    start = len(common) - 1
+    while start > 0 and common[start] - common[start - 1] == pd.Timedelta(minutes=1):
+        start -= 1
+    common = common[start:]
+    if len(common) < 2:
+        return df
+    first = common[0]
+    previous = df.index[df.index < first]
+    if len(previous) == 0:
+        return df
+    # Match FUT level to the first YF candle's opening price; otherwise
+    # futures basis can look like a sudden trend at the source boundary.
+    basis = float(fut.loc[first, "Open"]) - float(df.loc[first, "Open"])
+    blended = df.copy()
+    for column in ("Open", "High", "Low", "Close"):
+        adjusted_fut = fut.loc[common, column] - basis
+        blended.loc[common, column] = (
+            df.loc[common, column].astype(float) + adjusted_fut
+        ) / 2.0
+    blended.attrs.update(df.attrs)
+    blended.attrs["futures_history_blended"] = True
+    blended.attrs["futures_blended_candles"] = len(common)
+    return blended
+
+
 def _fetch_yf_data_production(
     period=None,
     interval=SYSDTAFPXY_DEFAULT_INTERVAL,
@@ -253,7 +326,7 @@ def _fetch_yf_data_production(
         df = df.tz_convert(TIMEZONE)
 
     # Indicators receive only unmodified Yahoo NIFTY OHLC candles.
-    processed_df = transform_market_data(df)
+    processed_df = _blend_available_futures_history(transform_market_data(df), interval)
 
     # Publish the two actual quotes already read above; never infer either
     # from transformed candles or perform an extra market-data request.
