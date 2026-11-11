@@ -174,6 +174,31 @@ def export_dtha_json(df, output_path, *, orient="split", date_format="iso"):
     return candles
 
 
+
+def publish_dtha_json_payload(payload, output_path, *, indent=2):
+    """Atomically publish a DTHA-derived display payload (never an input feed)."""
+    import json
+    import os
+    import tempfile
+
+    directory = os.path.dirname(os.path.abspath(output_path))
+    os.makedirs(directory, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=directory,
+            prefix=".dtha-", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = handle.name
+            json.dump(payload, handle, indent=indent, allow_nan=False)
+        os.replace(temporary, output_path)
+        temporary = None
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.unlink(temporary)
+    return payload
+
+
 def get_supr_signals(df, include_running=None):
     """Return SUPR IN/OUT from DTHA-transformed candles and SuperTrend.
 
