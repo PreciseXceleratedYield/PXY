@@ -533,6 +533,10 @@ def scan_events(state):
     minutes = stamp.hour * 60 + stamp.minute
     enabled = minutes < EVENT_WINDOW[1] or state.get("events_enabled", False)
     for line in capture_lines(state):
+        # Engine component timeouts are intentional; suppress them in the
+        # Control Tower only (alerts, event history, and daily counters).
+        if re.search(r"\bTIMEOUT\s*:", line, re.I) and re.search(r"\btimed out after\b", line, re.I):
+            continue
         if not PATTERN.search(line):
             continue
         # Normalize varying numeric details so repeated incidents share one key.
