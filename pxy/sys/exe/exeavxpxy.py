@@ -215,18 +215,6 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
     if not can_average:
         return
 
-    # When both option sides are open, permit averaging on either side only
-    # when BOTH sides simultaneously show an aggregate P&L loss > 7%.
-    # Single-side averaging retains its existing LGT eligibility.
-    if ce_lots > 0 and pe_lots > 0:
-        if not (ce_overall_pnl_pct < -7.0 and pe_overall_pnl_pct < -7.0):
-            logger.info(
-                "Both-side averaging blocked: CE %.2f%%, PE %.2f%%; "
-                "both must be below -7%% in the same snapshot.",
-                ce_overall_pnl_pct, pe_overall_pnl_pct,
-            )
-            return
-
     # Another process holds the ledger lock (a tick or a liquidation is running): place nothing this cycle
     is_ledger_busy = ledger_busy()
     if not averaging_placement_allowed(is_ledger_busy):
