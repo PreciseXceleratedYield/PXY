@@ -3,6 +3,7 @@
 import pandas as pd
 
 from sysdtafpxy import fetch_yf_data
+from sysdthapxy import transform_dtha_ohlc
 
 SWING_BARS = 2
 
@@ -24,6 +25,7 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
         if not isinstance(swing_bars, int) or isinstance(swing_bars, bool) or swing_bars < 1:
             return result
 
+        df = transform_dtha_ohlc(df)
         highs = pd.to_numeric(df["High"], errors="coerce").tolist()
         lows = pd.to_numeric(df["Low"], errors="coerce").tolist()
         closes = pd.to_numeric(df["Close"], errors="coerce").tolist()
