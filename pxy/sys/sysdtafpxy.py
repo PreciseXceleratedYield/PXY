@@ -2,6 +2,7 @@ import json
 import math
 import os
 import warnings
+import tempfile
 
 import numpy as np
 import pandas as pd
@@ -129,61 +130,157 @@ def _read_nifty_futures_price(max_age_seconds=None):
     return price
 
 
-def _blend_stale_yahoo_futures_momentum(df, interval, max_age_seconds):
-    """Use the literal 50/50 index/futures average when Yahoo 1m data is stale.
-
-    Only the current synthetic candle is added. Never rewrite the historical
-    Yahoo candles or manufacture a minute-by-minute futures history.
-    """
-    if interval != "1m" or df.empty or len(df) < 2:
-        return df
-    now = pd.Timestamp.now(tz=TIMEZONE)
-    if now.weekday() >= 5 or not (
-        pd.Timestamp("09:15").time() <= now.time()
-        < pd.Timestamp("15:30").time()
-    ):
-        return df
-
-    last = pd.Timestamp(df.index[-1])
-    last = last.tz_localize("UTC") if last.tzinfo is None else last
-    last = last.tz_convert(TIMEZONE)
-    if not (0 <= (now - last).total_seconds()) or (
-        now - last
-    ).total_seconds() <= max_age_seconds:
-        return df
-
-    # Strict 60-second freshness is retained for DTAF, independent of the
-    # longer futures-price tolerance used by syspxy.
-    futures_price = _read_nifty_futures_price()
-    if futures_price is None:
-        return df
+def _read_futures_quote():
+    """Return (price, receipt timestamp) only for a fresh futures quote."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exe", "run", "nftfut.json")
     try:
-        index_price = float(df["Close"].iloc[-1])
-    except (TypeError, ValueError, OverflowError):
-        return df
-    if not math.isfinite(index_price) or index_price <= 0:
-        return df
+        with open(path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+        if isinstance(payload, list):
+            payload = payload[-1] if payload else {}
+        if not isinstance(payload, dict):
+            return None
+        stamp = pd.Timestamp(payload.get("timestamp"))
+        if pd.isna(stamp) or stamp.tzinfo is None:
+            return None
+        stamp = stamp.tz_convert(TIMEZONE)
+        age = (pd.Timestamp.now(tz=TIMEZONE) - stamp).total_seconds()
+        price = float(payload.get("price", payload.get("Close", payload.get("last_price", 0))))
+        if not (0 <= age <= SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS
+                and math.isfinite(price) and price > 0):
+            return None
+        return price, stamp
+    except (OSError, ValueError, TypeError, OverflowError, json.JSONDecodeError):
+        return None
 
-    blended_close = (index_price + futures_price) / 2.0
-    minute = now.floor("min")
-    if minute <= last:
-        return df
 
-    # Open at the last Yahoo close, so any futures/spot basis gap is visible
-    # rather than silently hidden from the indicators.
-    extended = df.copy()
-    extended.loc[minute, ["Open", "High", "Low", "Close"]] = [
-        index_price,
-        max(index_price, blended_close),
-        min(index_price, blended_close),
-        blended_close,
-    ]
-    if "Volume" in extended.columns:
-        extended.loc[minute, "Volume"] = 0.0
-    extended.attrs.update(df.attrs)
-    extended.attrs["futures_price_average_fallback"] = True
-    extended.attrs["yahoo_last_timestamp"] = last.isoformat()
-    return extended
+def _continuous_signal_candles(yahoo, interval, target_rows):
+    """Append timestamped source candles without replaying or repricing history.
+
+    Futures minute OHLC is assembled from successive received quotes. The
+    continuity offset belongs to the signal stream only, never order pricing.
+    State survives engine process restarts and resets each exchange day.
+    """
+    if interval != "1m" or yahoo.empty:
+        return yahoo
+
+    now = pd.Timestamp.now(tz=TIMEZONE)
+    last_yahoo = pd.Timestamp(yahoo.index[-1]).tz_convert(TIMEZONE)
+    yahoo_age = (now - last_yahoo).total_seconds()
+    yahoo_fresh = 0 <= yahoo_age <= SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS
+    in_session = (now.weekday() < 5 and
+                  pd.Timestamp("09:15").time() <= now.time() <
+                  pd.Timestamp("15:30").time())
+    quote = _read_futures_quote() if in_session else None
+    state_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "exe", "run", "dtaf_source_state.json")
+    state = {}
+    try:
+        with open(state_path, encoding="utf-8") as handle:
+            state = json.load(handle)
+        if state.get("day") != now.date().isoformat():
+            state = {}
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        state = {}
+
+    fields = ["Open", "High", "Low", "Close"]
+    history = []
+    for item in state.get("candles", []):
+        try:
+            stamp = pd.Timestamp(item["time"])
+            if stamp.tzinfo is None:
+                continue
+            vals = [float(item[field]) for field in fields]
+            if all(math.isfinite(v) and v > 0 for v in vals):
+                history.append((stamp.tz_convert(TIMEZONE), vals))
+        except (KeyError, ValueError, TypeError, OverflowError):
+            continue
+    history.sort(key=lambda item: item[0])
+    history = list(dict(history).items())
+    if not history:
+        history = [(stamp, [float(row[field]) for field in fields])
+                   for stamp, row in yahoo.tail(max(target_rows, 90)).iterrows()]
+        state = {"source": "YAHOO", "offset": 0.0}
+
+    source = str(state.get("source", "YAHOO"))
+    offset = float(state.get("offset", 0.0))
+    if not math.isfinite(offset):
+        offset = 0.0
+    last_time, last_vals = history[-1]
+    last_close = last_vals[3]
+    chosen = "YAHOO" if yahoo_fresh else ("FUTURES" if quote else "STALE")
+
+    if chosen == "YAHOO":
+        # On return to Yahoo, anchor the first unseen Yahoo bar to the
+        # previously published close. Never rewrite earlier futures candles.
+        unseen = yahoo[yahoo.index > last_time]
+        if not unseen.empty:
+            if source != "YAHOO":
+                first = unseen.iloc[0]
+                offset = last_close - float(first["Open"])
+            for stamp, row in unseen.iterrows():
+                vals = [float(row[field]) + offset for field in fields]
+                if all(math.isfinite(v) and v > 0 for v in vals):
+                    history.append((stamp, vals))
+            source = "YAHOO"
+        elif source == "YAHOO":
+            # Update an in-progress Yahoo bar, retaining its existing offset.
+            if last_time == last_yahoo:
+                row = yahoo.iloc[-1]
+                history[-1] = (last_time, [float(row[field]) + offset for field in fields])
+        # If Yahoo recovers within an already published futures minute,
+        # keep that minute unchanged and switch at the next Yahoo minute.
+    elif chosen == "FUTURES":
+        price, stamp = quote
+        minute = stamp.floor("min")
+        if source != "FUTURES":
+            offset = last_close - price
+        adjusted = price + offset
+        if minute > last_time:
+            history.append((minute, [last_close, max(last_close, adjusted),
+                                     min(last_close, adjusted), adjusted]))
+            source = "FUTURES"
+        elif minute == last_time and source == "FUTURES":
+            vals = history[-1][1]
+            history[-1] = (minute, [vals[0], max(vals[1], adjusted),
+                                    min(vals[2], adjusted), adjusted])
+
+    # The previous session's history is never used as a continuity anchor.
+    history = history[-max(target_rows, 90):]
+    result = pd.DataFrame([vals for _, vals in history],
+                          index=pd.DatetimeIndex([stamp for stamp, _ in history]),
+                          columns=fields)
+    if "Volume" in yahoo.columns:
+        result["Volume"] = 0.0
+    result.attrs["market_data_source"] = source
+    result.attrs["market_data_fresh"] = bool(
+        chosen == "YAHOO" or (chosen == "FUTURES" and source == "FUTURES"))
+    result.attrs["futures_price_average_fallback"] = False
+    result.attrs["data_fallback"] = False
+    result.attrs["yahoo_last_timestamp"] = last_yahoo.isoformat()
+
+    # No runtime state writes during off-hours, and no invented future candles.
+    if in_session and chosen != "STALE":
+        payload = {
+            "day": now.date().isoformat(), "source": source,
+            "offset": offset,
+            "candles": [{"time": stamp.isoformat(), **dict(zip(fields, vals))}
+                        for stamp, vals in history],
+        }
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        tmp = None
+        try:
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8",
+                    dir=os.path.dirname(state_path), prefix=".dtaf-",
+                    suffix=".tmp", delete=False) as handle:
+                tmp = handle.name
+                json.dump(payload, handle, allow_nan=False)
+            os.replace(tmp, state_path)
+            tmp = None
+        finally:
+            if tmp and os.path.exists(tmp):
+                os.unlink(tmp)
+    return result
 
 
 def _fetch_yf_data_production(
@@ -287,15 +384,10 @@ def _fetch_yf_data_production(
     except (OSError, ValueError, TypeError, OverflowError):
         pass
 
-    # Preserve Yahoo history; append one synthetic current candle only when
-    # Yahoo is stale and the futures quote passes its 60-second receipt-age gate.
-    processed_df = _blend_stale_yahoo_futures_momentum(
-        processed_df, interval, SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS
-    )
-    fallback_active = bool(processed_df.attrs.get("futures_price_average_fallback", False))
-    processed_df = processed_df.tail(target_rows)
-    processed_df.attrs["data_fallback"] = False
-    processed_df.attrs["futures_price_average_fallback"] = fallback_active
+    processed_df = _continuous_signal_candles(processed_df, interval, target_rows)
+    metadata = dict(processed_df.attrs)
+    processed_df = processed_df.tail(target_rows).copy()
+    processed_df.attrs.update(metadata)
 
     return processed_df
 
