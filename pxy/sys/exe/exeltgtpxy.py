@@ -133,7 +133,7 @@ def calculate_tgt(
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
 
         if not is_aligned:
-            # Both-side non-aligned target uses opposite/own current market worth.
+            # Both-side non-aligned target is max(1.4, opposite/own market worth).
             # Missing or invalid worth data uses the minimum divisor.
             try:
                 own_value = float(own_worth)
@@ -146,7 +146,7 @@ def calculate_tgt(
                 )
             except (TypeError, ValueError, OverflowError, ZeroDivisionError):
                 worth_ratio = 0.0
-            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X / max(1.4, worth_ratio))
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, max(1.4, worth_ratio))
 
         # Aligned positions use the same target formula whether one or both sides are open.
         both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
