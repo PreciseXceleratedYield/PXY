@@ -2,6 +2,7 @@
 import math
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
+from sysdthapxy import transform_dtha_ohlc
 from syscnfgpxy import SYSPWERPXY_LOOKBACK_PERIOD
 from colorama import Fore, Style, init
 
@@ -32,7 +33,7 @@ def get_ce_pe_power(df=None):
     if df.empty or len(df) < 5:
         return "Flat", 1, 1  # fallback
 
-    df = df[['Close']].astype(float).copy()
+    df = transform_dtha_ohlc(df)[['Close']].astype(float).copy()
 
     # 1. Calculate absolute candle price changes (Close to Close)
     df['move'] = df['Close'] - df['Close'].shift(1)
