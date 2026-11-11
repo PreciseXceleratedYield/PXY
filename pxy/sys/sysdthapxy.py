@@ -15,10 +15,14 @@ from sysdtafpxy import fetch_yf_data
 
 
 def _dtha_row_key(idx):
-    timestamp = pd.Timestamp(idx)
-    if timestamp.tzinfo is None:
-        timestamp = timestamp.tz_localize("UTC")
-    return timestamp.tz_convert("UTC").isoformat()
+    """Use the same key for equivalent timestamps in different timezones."""
+    try:
+        timestamp = pd.Timestamp(idx)
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.tz_localize("UTC")
+        return timestamp.tz_convert("UTC").isoformat()
+    except (TypeError, ValueError):
+        return str(idx)
 
 
 def _dtha_ohlc_signature(df):
@@ -38,7 +42,17 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     required = ("Open", "High", "Low", "Close")
     if any(column not in df.columns for column in required):
-        return df.copy()
+        raise ValueError("DTHA requires Open, High, Low, and Close columns.")
+
+    numeric = df.loc[:, list(required)].apply(pd.to_numeric, errors="coerce")
+    if not np.isfinite(numeric.to_numpy(dtype=float)).all():
+        raise ValueError("DTHA requires finite numeric OHLC candles.")
+    if not (
+        (numeric > 0).all().all()
+        and (numeric["High"] >= numeric[["Open", "Low", "Close"]].max(axis=1)).all()
+        and (numeric["Low"] <= numeric[["Open", "High", "Close"]].min(axis=1)).all()
+    ):
+        raise ValueError("DTHA received invalid OHLC ranges.")
 
     prior_mode = df.attrs.get("pxy_dtha_mode")
     if prior_mode is not None:
