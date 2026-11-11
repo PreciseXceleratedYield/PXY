@@ -5,7 +5,6 @@ import pandas as pd
 from syscnfgpxy import (
     SYSINPXY_CONFIRM_MODE,
     SYSINPXY_SIGNAL_MODE,
-    SYSDTHAPXY_CANDLE_MODE,
 )
 from sysdtafpxy import fetch_yf_data
 from sysdirpxy import detect_raw_direction
@@ -37,11 +36,11 @@ def get_signal(df=None):
                 return {"UP": "SELL", "DOWN": "BUY"}.get(raw_direction, "NONE")
             return "NONE"
 
-        if SYSINPXY_SIGNAL_MODE == "DTHA" and SYSDTHAPXY_CANDLE_MODE == "STMA":
-            return get_stma_signals(df)[0]
-
-        if SYSINPXY_SIGNAL_MODE == "DTHA" and SYSDTHAPXY_CANDLE_MODE == "STRW":
+        if SYSINPXY_SIGNAL_MODE == "STRW":
             return get_strw_signals(df)[0]
+
+        if SYSINPXY_SIGNAL_MODE != "TSMA":
+            return "NONE"
 
         transformed = transform_dtha_ohlc(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
