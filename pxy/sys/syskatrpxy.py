@@ -4,6 +4,7 @@ import re
 import pandas as pd
 import numpy as np
 from sysdtafpxy import fetch_yf_data
+from sysdthapxy import transform_dtha_ohlc
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_MARKET_OPEN,
@@ -42,7 +43,7 @@ def calculate_true_atr_series(df: pd.DataFrame) -> pd.Series:
         if df is None or df.empty:
             return pd.Series(dtype=float, name="atr")
         
-        df_clean = df.copy()
+        df_clean = transform_dtha_ohlc(df)
         df_clean.columns = [c.lower() for c in df_clean.columns]
 
         if not isinstance(df_clean.index, pd.DatetimeIndex):
@@ -156,7 +157,7 @@ def calculate_dynamic_k(df: pd.DataFrame) -> int:
 
 if __name__ == "__main__":
     try:
-        df = fetch_yf_data()
+        df = transform_dtha_ohlc(fetch_yf_data())
         final_atr = _configured_atr_fallback()
         final_k = 2
         
