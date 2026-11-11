@@ -1719,8 +1719,9 @@ function drawRiskCandle(floor,net,peak){
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);
     const PADX=12,midY=H/2,fz=15,bodyH=fz+12;
-    // The candle uses 66% of the total usable bar: 33% on each side of zero.
-    const centerX=W/2,halfW=Math.max(0,(W-PADX*2)*0.33);
+    // Each direction can fill 66% of the TOTAL usable width.
+    // Positive fills from the right edge inward; negative mirrors from the left.
+    const centerX=W/2,maxExtent=Math.max(0,(W-PADX*2)*0.66);
     const booked=Number(riskData.booked_profit??bookedTotal)||0;
     const running=Number(net)||0;
     const combined=booked+running;
@@ -1728,8 +1729,8 @@ function drawRiskCandle(floor,net,peak){
     // Net direction selects the half; opposing PNL reduces the filled fraction.
     // Same-sign booked/running PNL fills the entire corresponding half.
     const fraction=denominator>0?Math.min(1,Math.abs(combined)/denominator):0;
-    const extent=halfW*fraction;
-    const left=combined<0?centerX-extent:centerX;
+    const extent=maxExtent*fraction;
+    const left=combined<0?PADX:W-PADX-extent;
     const bodyColor=combined<0?cssVar('--risk-bear'):cssVar('--risk-bull');
     const by=midY-bodyH/2;
     ctx.strokeStyle=cssVar('--rk-grid');ctx.lineWidth=1;
