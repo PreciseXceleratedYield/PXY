@@ -1,6 +1,6 @@
 # sysmktpxy.py
 from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED, SYSMKTPXY_ENTRY_FILTER
-from sysdthapxy import get_signal_depth_analysis
+from sysdthapxy import get_signal_depth_analysis, transform_dtha_ohlc
 from sysdtafpxy import fetch_yf_data
 from sysinpxy import get_entry_signal
 from sysoutpxy import get_signal as get_exit_signal
@@ -65,11 +65,11 @@ def get_signals(df=None):
         if entry_signal in {"BUY", "SELL"}:
             if SYSMKTPXY_ENTRY_FILTER == "SMA":
                 try:
-                    filter_direction = get_sma_signal(df)["status"]
+                    filter_direction = get_sma_signal(transform_dtha_ohlc(df))["status"]
                 except Exception:
                     filter_direction = "NA"
             elif SYSMKTPXY_ENTRY_FILTER == "SDIR":
-                filter_direction = get_structure_direction(df).get("direction")
+                filter_direction = get_structure_direction(transform_dtha_ohlc(df)).get("direction")
             else:
                 filter_direction = None
 
