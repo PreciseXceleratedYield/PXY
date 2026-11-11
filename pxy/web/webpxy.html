@@ -1719,8 +1719,8 @@ function drawRiskCandle(floor,net,peak){
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);
     const PADX=12,midY=H/2,fz=15,bodyH=fz+12;
-    // Reserve the outer third of each half for breathing room around the PNL labels.
-    const centerX=W/2,halfW=Math.max(0,(W/2-PADX)*0.66);
+    // The candle uses 66% of the total usable bar: 33% on each side of zero.
+    const centerX=W/2,halfW=Math.max(0,(W-PADX*2)*0.33);
     const booked=Number(riskData.booked_profit??bookedTotal)||0;
     const running=Number(net)||0;
     const combined=booked+running;
