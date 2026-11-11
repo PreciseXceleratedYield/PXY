@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from syscnfgpxy import SYSDTSTPXY_ST1_FACTOR, SYSDTSTPXY_ST1_PERIOD
+from sysdthapxy import transform_dtha_ohlc
 
 
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
@@ -72,7 +73,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """Add ST, ST Mirror, and the agreed BULL/SIDE/BEAR price classification."""
     if df is None or df.empty:
         return pd.DataFrame() if df is None else df.copy()
-    result = df.copy()
+    result = transform_dtha_ohlc(df)
     high = pd.to_numeric(result["High"], errors="coerce")
     low = pd.to_numeric(result["Low"], errors="coerce")
     close = pd.to_numeric(result["Close"], errors="coerce")
