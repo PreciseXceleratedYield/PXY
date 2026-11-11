@@ -205,9 +205,28 @@ def available_field(label, value):
     return field(label, value)
 
 
+def _display_width(value):
+    """Approximate Telegram monospace columns; count emoji as two cells."""
+    import unicodedata
+
+    width = 0
+    for char in str(value):
+        code = ord(char)
+        if char in ("\ufe0e", "\ufe0f", "\u200d") or unicodedata.combining(char):
+            continue
+        if (0x1F000 <= code <= 0x1FAFF or 0x2600 <= code <= 0x27BF
+                or unicodedata.east_asian_width(char) in ("W", "F")):
+            width += 2
+        else:
+            width += 1
+    return width
+
+
 def field(label, value):
-    """Ten-character label, then space-colon-space; HTML-safe values."""
-    return f"{label:<10}: {html.escape(str(value))}"
+    """Align all Telegram report, cycle and event labels in 13 display cells."""
+    label = str(label)
+    padding = max(0, 13 - _display_width(label))
+    return f"{html.escape(label)}{' ' * padding}: {html.escape(str(value))}"
 
 
 def safe_number(value):
