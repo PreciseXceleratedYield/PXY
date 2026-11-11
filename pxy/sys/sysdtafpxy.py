@@ -161,12 +161,13 @@ def _continuous_signal_candles(yahoo, interval, target_rows):
     continuity offset belongs to the signal stream only, never order pricing.
     State survives engine process restarts and resets each exchange day.
     """
-    if interval != "1m" or yahoo.empty:
+    if interval != "1m":
         return yahoo
 
     now = pd.Timestamp.now(tz=TIMEZONE)
-    last_yahoo = pd.Timestamp(yahoo.index[-1]).tz_convert(TIMEZONE)
-    yahoo_age = (now - last_yahoo).total_seconds()
+    last_yahoo = (pd.Timestamp(yahoo.index[-1]).tz_convert(TIMEZONE)
+                  if not yahoo.empty else None)
+    yahoo_age = (now - last_yahoo).total_seconds() if last_yahoo is not None else float("inf")
     yahoo_fresh = 0 <= yahoo_age <= SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS
     in_session = (now.weekday() < 5 and
                   pd.Timestamp("09:15").time() <= now.time() <
@@ -197,10 +198,14 @@ def _continuous_signal_candles(yahoo, interval, target_rows):
             continue
     history.sort(key=lambda item: item[0])
     history = list(dict(history).items())
-    if not history:
+    if not history and not yahoo.empty:
         history = [(stamp, [float(row[field]) for field in fields])
                    for stamp, row in yahoo.tail(max(target_rows, 90)).iterrows()]
         state = {"source": "YAHOO", "offset": 0.0}
+    if not history:
+        # A single futures quote cannot reconstruct the indicator lookback.
+        # Fail closed until real Yahoo history or same-day persisted history exists.
+        return pd.DataFrame()
 
     source = str(state.get("source", "YAHOO"))
     offset = float(state.get("offset", 0.0))
@@ -257,7 +262,7 @@ def _continuous_signal_candles(yahoo, interval, target_rows):
         chosen == "YAHOO" or (chosen == "FUTURES" and source == "FUTURES"))
     result.attrs["futures_price_average_fallback"] = False
     result.attrs["data_fallback"] = False
-    result.attrs["yahoo_last_timestamp"] = last_yahoo.isoformat()
+    result.attrs["yahoo_last_timestamp"] = last_yahoo.isoformat() if last_yahoo is not None else None
 
     # No runtime state writes during off-hours, and no invented future candles.
     if in_session and chosen != "STALE":
@@ -333,12 +338,12 @@ def _fetch_yf_data_production(
 
     futures_price = _read_nifty_futures_price()
 
-    # ======================================================================
-    # YF-only indicator candles: never manufacture historical OHLC from
-    # a single futures quote. Return unavailable if YF has insufficient data.
+    # A Yahoo outage can use same-day persisted DTAF history plus fresh futures.
+    # Never create a synthetic history from only one futures quote.
     if df.empty or len(df) < buffer_rows:
-        print("Warning: Yahoo NIFTY candle history unavailable or insufficient.")
-        return pd.DataFrame()
+        print("Warning: Yahoo NIFTY candle history unavailable or insufficient; "
+              "trying persisted DTAF continuity state.")
+        return _continuous_signal_candles(pd.DataFrame(), interval, target_rows)
 
     # Normalize the index to the configured timezone.
     if not isinstance(df.index, pd.DatetimeIndex):
