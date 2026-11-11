@@ -6,6 +6,7 @@ from sysmktpxy import get_signals as get_market_signals
 from sysdirpxy import detect_raw_direction
 from sysmrngpxy import get_morning_direction
 from sysbbospxy import get_bos_bar
+from sysdthapxy import transform_dtha_ohlc
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_FRESH_ENTRY_START,
@@ -51,7 +52,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     else:
         now_time = now
 
-    # Morning OC/2 direction override using the current DTAF snapshot.
+    # Morning direction override using the configured DTHA candles.
     # Master liquidation, cooldown, and entry-time restrictions still take precedence.
     if ENTRY_START <= now_time < MORNING_OVERRIDE_END:
         try:
@@ -92,7 +93,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     # OUT and all risk/time gates remain unchanged.
     if now_time >= MORNING_OVERRIDE_END:
         try:
-            _, bos_signal = get_bos_bar(df)
+            _, bos_signal = get_bos_bar(transform_dtha_ohlc(df))
             bos_signal = str(bos_signal).upper().strip()
             if bos_signal in {"NBUY", "MBUY"}:
                 raw_entry = "BUY"
