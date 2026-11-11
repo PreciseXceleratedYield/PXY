@@ -7,6 +7,7 @@ import pandas as pd
 from syscnfgpxy import SYSSMAPXY_TSMA_PERIOD
 from syssmapxy import calculate_moving_average
 from sysdtafpxy import fetch_yf_data
+from sysdthapxy import transform_dtha_ohlc
 
 
 TSMA_PERIOD = SYSSMAPXY_TSMA_PERIOD
@@ -56,7 +57,7 @@ def get_signal_analysis(df=None):
         ):
             return _none_result()
 
-        close = pd.to_numeric(df["Close"], errors="coerce")
+        close = pd.to_numeric(transform_dtha_ohlc(df)["Close"], errors="coerce")
         tsma = calculate_tsma(close, period=TSMA_PERIOD)
 
         current_close = float(close.iloc[-1])
