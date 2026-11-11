@@ -133,13 +133,8 @@ def calculate_tgt(
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
 
         if not is_aligned:
-            # Both-side non-aligned target follows opposite/own market worth.
-            # Zero or invalid own worth must not produce an infinite target.
-            own = float(own_worth)
-            opposite = float(opposite_worth)
-            if not all(math.isfinite(v) for v in (own, opposite)) or own <= 0 or opposite < 0:
-                return 0.0
-            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X * opposite / own)
+            # Both-side non-aligned (counter) target decreases with own layer count.
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X / max(1, own_count))
 
         # Aligned positions use the same target formula whether one or both sides are open.
         both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
