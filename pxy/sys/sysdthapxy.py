@@ -14,6 +14,11 @@ from syssmapxy import calculate_moving_average
 from sysdtafpxy import fetch_yf_data
 
 
+def _dtha_ohlc_signature(df):
+    """Fingerprint OHLC values and index, excluding unrelated indicator columns."""
+    return int(pd.util.hash_pandas_object(df.loc[:, ["Open", "High", "Low", "Close"]], index=True).sum())
+
+
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     """Transform raw market OHLC once using one of six pure candle modes."""
     valid_modes = {"RAW", "OC2", "OCC3", "OHLC4", "HKIN", "HYPR"}
@@ -27,7 +32,12 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     if any(column not in df.columns for column in required):
         return df.copy()
 
-    if df.attrs.get("pxy_dtha_mode") == mode:
+    prior_mode = df.attrs.get("pxy_dtha_mode")
+    if prior_mode is not None:
+        if df.attrs.get("pxy_dtha_signature") != _dtha_ohlc_signature(df):
+            raise ValueError("DTHA OHLC changed after transformation; provide raw candles.")
+        if prior_mode != mode:
+            raise ValueError("Cannot transform an already transformed frame to another mode.")
         return df.copy()
     out = df.copy()
     raw_open = pd.to_numeric(out["Open"], errors="coerce").to_numpy(dtype=float)
@@ -37,17 +47,19 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     if mode == "RAW":
         out.attrs["pxy_dtha_mode"] = mode
-        out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         return out
 
     if mode == "OC2":
         out["Close"] = (raw_open + raw_close) / 2.0
         out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         return out
 
     if mode == "OCC3":
         out["Close"] = (raw_open + 2.0 * raw_close) / 3.0
         out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         return out
 
     if mode == "OHLC4":
@@ -55,6 +67,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
             raw_open + raw_high + raw_low + raw_close
         ) / 4.0
         out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         return out
 
     if mode == "HYPR":
@@ -67,6 +80,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Open"] = raw_close
         out["Close"] = hyper_close
         out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         return out
 
     # Standard Heikin-Ashi candles.
@@ -89,6 +103,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     out["Low"] = ha_low
     out["Close"] = ha_close
     out.attrs["pxy_dtha_mode"] = mode
+    out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
     return out
 
 
@@ -114,6 +129,12 @@ def get_supr_signals(df, include_running=None):
     for name in required:
         raw[name] = pd.to_numeric(raw[name], errors="coerce")
     if not np.isfinite(raw.to_numpy(dtype=float)).all():
+        return neutral
+    if not (
+        (raw["High"] >= raw[["Open", "Low", "Close"]].max(axis=1)).all()
+        and (raw["Low"] <= raw[["Open", "High", "Close"]].min(axis=1)).all()
+        and (raw > 0).all().all()
+    ):
         return neutral
 
     closes = raw["Close"].to_numpy(dtype=float)
@@ -322,6 +343,8 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
 
     # Inject the live market tick into the raw running candle first.
     if live_tick is not None:
+        if df.attrs.get("pxy_dtha_mode") is not None:
+            raise ValueError("Live ticks must be injected into raw DTAF candles before DTHA.")
         last_idx = df.index[-1]
         df.loc[last_idx, "Open"] = live_tick["Open"]
         df.loc[last_idx, "High"] = max(live_tick["High"], live_tick["Close"])
