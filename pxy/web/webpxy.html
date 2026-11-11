@@ -1139,14 +1139,18 @@ function drawChart(candles){
         const prevClose=i>0?vis[i-1].c:(candles[startIdx-1]?.c??c.o);
         const color=directionColor(candleDirection(c.c,prevClose));
 
-        ctx.strokeStyle=cssVar('--wick');ctx.lineWidth=1;
-        ctx.beginPath();
-        ctx.moveTo(x,toY(c.h));ctx.lineTo(x,toY(c.l));
-        ctx.stroke();
-
         const yOpen=toY(c.o),yClose=toY(c.c);
         const bodyTop=Math.min(yOpen,yClose);
         const bodyH=Math.max(3,Math.abs(yClose-yOpen));
+        const bodyBottom=bodyTop+bodyH;
+
+        // Draw only wick segments outside the candle body; leave its center clear.
+        ctx.strokeStyle=cssVar('--wick');ctx.lineWidth=1;
+        ctx.beginPath();
+        const highY=toY(c.h),lowY=toY(c.l);
+        if(highY<bodyTop){ctx.moveTo(x,highY);ctx.lineTo(x,bodyTop);}
+        if(lowY>bodyBottom){ctx.moveTo(x,bodyBottom);ctx.lineTo(x,lowY);}
+        ctx.stroke();
         const bx=x-bodyW/2;
         const r=Math.min(bodyW/2,2);
 
