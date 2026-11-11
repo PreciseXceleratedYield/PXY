@@ -202,7 +202,7 @@ def publish_dtha_json_payload(payload, output_path, *, indent=2):
 def get_supr_signals(df, include_running=None):
     """Return SUPR IN/OUT from DTHA-transformed candles and SuperTrend.
 
-    IN suppresses entries on SuperTrend flips, otherwise uses ST/candle disagreement.\n    Flat transformed-close change gives NONE/SIDE.
+    IN uses SuperTrend flips or ST/candle disagreement.\n    Flat transformed-close change gives NONE/SIDE.
     """
     from sysstrnpxy import _compute_single_st
 
@@ -247,7 +247,7 @@ def get_supr_signals(df, include_running=None):
     else:
         return neutral
 
-    # Suppress IN on a SuperTrend flip candle; OUT retains raw/ST agreement behavior.
+    # Qualify SuperTrend flips as IN signals; OUT retains raw/ST agreement behavior.
     previous_st_line = st_line[-2]
     previous_st_direction = (
         "BULL" if closes[-2] > previous_st_line
@@ -259,7 +259,7 @@ def get_supr_signals(df, include_running=None):
     else:
         out_signal = "SIDE"
     if previous_st_direction is not None and previous_st_direction != st_direction:
-        return ("NONE", out_signal)
+        return ("BUY" if st_direction == "BULL" else "SELL", out_signal)
     if st_direction == raw_direction:
         return ("NONE", out_signal)
     return ("BUY" if st_direction == "BULL" else "SELL", out_signal)
