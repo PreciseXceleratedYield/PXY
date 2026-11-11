@@ -1719,9 +1719,9 @@ function drawRiskCandle(floor,net,peak){
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);
     const PADX=12,midY=H/2,fz=15,bodyH=fz+12;
-    // Each direction can fill 66% of the TOTAL usable width.
+    // Each direction can fill 80% of the TOTAL usable width on desktop and mobile.
     // Positive fills from the right edge inward; negative mirrors from the left.
-    const centerX=W/2,maxExtent=Math.max(0,(W-PADX*2)*0.66);
+    const centerX=W/2,maxExtent=Math.max(0,(W-PADX*2)*0.80);
     const booked=Number(riskData.booked_profit??bookedTotal)||0;
     const running=Number(net)||0;
     const combined=booked+running;
