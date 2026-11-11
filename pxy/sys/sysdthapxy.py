@@ -14,6 +14,13 @@ from syssmapxy import calculate_moving_average
 from sysdtafpxy import fetch_yf_data
 
 
+def _dtha_row_key(idx):
+    timestamp = pd.Timestamp(idx)
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.tz_localize("UTC")
+    return timestamp.tz_convert("UTC").isoformat()
+
+
 def _dtha_ohlc_signature(df):
     """Fingerprint OHLC values and index, excluding unrelated indicator columns."""
     values = df.loc[:, ["Open", "High", "Low", "Close"]].apply(pd.to_numeric, errors="coerce").astype(float)
@@ -41,7 +48,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         # against its original row hash when the original index is retained.
         original_rows = df.attrs.get("pxy_dtha_rows")
         if original_rows is not None:
-            if any(original_rows.get(str(idx)) != h for idx, h in zip(df.index, current_signature)):
+            if any(original_rows.get(_dtha_row_key(idx)) != h for idx, h in zip(df.index, current_signature)):
                 raise ValueError("DTHA OHLC changed after transformation; provide raw candles.")
         elif prior_signature != current_signature:
             raise ValueError("DTHA OHLC changed after transformation; provide raw candles.")
@@ -57,21 +64,21 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     if mode == "RAW":
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
-        out.attrs["pxy_dtha_rows"] = dict(zip(map(str, out.index), out.attrs["pxy_dtha_signature"]))
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
         return out
 
     if mode == "OC2":
         out["Close"] = (raw_open + raw_close) / 2.0
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
-        out.attrs["pxy_dtha_rows"] = dict(zip(map(str, out.index), out.attrs["pxy_dtha_signature"]))
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
         return out
 
     if mode == "OCC3":
         out["Close"] = (raw_open + 2.0 * raw_close) / 3.0
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
-        out.attrs["pxy_dtha_rows"] = dict(zip(map(str, out.index), out.attrs["pxy_dtha_signature"]))
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
         return out
 
     if mode == "OHLC4":
@@ -80,7 +87,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         ) / 4.0
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
-        out.attrs["pxy_dtha_rows"] = dict(zip(map(str, out.index), out.attrs["pxy_dtha_signature"]))
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
         return out
 
     if mode == "HYPR":
@@ -94,7 +101,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Close"] = hyper_close
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
-        out.attrs["pxy_dtha_rows"] = dict(zip(map(str, out.index), out.attrs["pxy_dtha_signature"]))
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
         return out
 
     # Standard Heikin-Ashi candles.
@@ -118,7 +125,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     out["Close"] = ha_close
     out.attrs["pxy_dtha_mode"] = mode
     out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
-        out.attrs["pxy_dtha_rows"] = dict(zip(map(str, out.index), out.attrs["pxy_dtha_signature"]))
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
     return out
 
 
