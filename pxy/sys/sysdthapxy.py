@@ -128,7 +128,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
 
 def get_strw_signals(df, include_running=None):
-    """Return STRW IN/OUT from raw close direction and SuperTrend(1, 1).
+    """Return STRW IN/OUT from raw close direction and configured SuperTrend period and factor.
 
     IN suppresses entries on SuperTrend flips, otherwise uses ST/raw disagreement.\n    Both ST and direction use the same raw candles. A flat close or invalid price produces NONE/SIDE.
     """
@@ -157,7 +157,7 @@ def get_strw_signals(df, include_running=None):
         return neutral
     raw_direction = "BULL" if change > 0 else "BEAR"
 
-    st_line, _ = _compute_single_st(raw, period=1, factor=1)
+    st_line, _ = _compute_single_st(raw, period=SYSDTSTPXY_ST1_PERIOD, factor=SYSDTSTPXY_ST1_FACTOR)
     if not len(st_line) or not np.isfinite(st_line[-1]):
         return neutral
     # Standard SuperTrend: price above the active band is bullish,
