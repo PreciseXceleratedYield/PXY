@@ -176,6 +176,10 @@ if SYSDTHAPXY_CANDLE_MODE not in {"RAW0", "RAW2", "OCC3", "HKIN", "RAW4", "HYPR"
 SYSINPXY_SIGNAL_MODE = "STRW"
 # Switch or algorithm selection for signal mode.
 SYSOUTPXY_SIGNAL_MODE = "STRW"
+if SYSINPXY_SIGNAL_MODE not in {"TSMA", "STRW"}:
+    raise ValueError("SYSINPXY_SIGNAL_MODE must be TSMA or STRW.")
+if SYSOUTPXY_SIGNAL_MODE not in {"TSMA", "STRW"}:
+    raise ValueError("SYSOUTPXY_SIGNAL_MODE must be TSMA or STRW.")
 # Controls inclusion of the forming candle in DTHA analyses.
 SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
