@@ -56,40 +56,27 @@ def get_full_snapshot(monitor=False):
         return None
 
     master_df = chart_source_df.tail(SYSDTAFPXY_DEFAULT_TARGET_ROWS).copy()
-    is_futures_fallback = bool(master_df.attrs.get("data_fallback", False))
-    blended_fallback = bool(master_df.attrs.get("futures_price_average_fallback", False))
-    result["market_data_available"] = not is_futures_fallback
-    result["market_data_source"] = "YAHOO_FUTURES_BLEND" if blended_fallback else "YAHOO"
-    result["market_data_fallback"] = blended_fallback
+    source = str(master_df.attrs.get("market_data_source", "YAHOO"))
+    data_fresh = bool(master_df.attrs.get("market_data_fresh", False))
+    result["market_data_available"] = bool(data_fresh)
+    result["market_data_source"] = source
+    result["market_data_fallback"] = source == "FUTURES"
 
-    # Yahoo timestamps are candle-start times. Measure the age in configured
-    # IST; this is warning-only and deliberately does not gate any signal.
     candle_timestamp = pd.Timestamp(master_df.index[-1])
     if candle_timestamp.tzinfo is None:
         candle_timestamp = candle_timestamp.tz_localize("UTC")
     candle_timestamp = candle_timestamp.tz_convert(SYSCNFGPXY_TIMEZONE)
     now_timestamp = pd.Timestamp.now(tz=SYSCNFGPXY_TIMEZONE)
-    candle_age_seconds = (
-        now_timestamp - candle_timestamp
-    ).total_seconds()
+    candle_age_seconds = (now_timestamp - candle_timestamp).total_seconds()
     market_time = now_timestamp.time()
     is_exchange_session = (
         now_timestamp.weekday() < 5
-        and SYSCNFGPXY_MARKET_OPEN
-        <= market_time
-        < SYSCNFGPXY_TRADING_DAY_END
+        and SYSCNFGPXY_MARKET_OPEN <= market_time < SYSCNFGPXY_TRADING_DAY_END
     )
-    # Freshness is an execution property, not just a session warning.
-    # The synthetic fallback is accepted only when its 60-second futures
-    # freshness check succeeded in DTAF, and its timestamp remains current.
-    max_age = (SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS if blended_fallback
-               else SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS)
-    data_fresh = (not is_futures_fallback and 0 <= candle_age_seconds <= max_age)
-    candle_is_stale = is_exchange_session and not data_fresh
-    result["market_data_fresh"] = bool(data_fresh)
+    result["market_data_fresh"] = data_fresh
     result["market_data_timestamp"] = candle_timestamp.isoformat()
     result["market_data_age_seconds"] = round(candle_age_seconds, 1)
-    result["market_data_stale"] = bool(candle_is_stale)
+    result["market_data_stale"] = bool(is_exchange_session and not data_fresh)
 
     # DTHA transforms candles once; all downstream analytics use these frames.
     dtha_master = transform_dtha_ohlc(master_df)

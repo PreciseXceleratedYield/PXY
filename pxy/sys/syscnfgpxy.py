@@ -225,7 +225,7 @@ if (
 # Yahoo 1-minute candle timestamps represent the candle start, so allow
 # three minutes for normal publication/API delay before warning.
 # Limit or threshold governing yahoo max age seconds.
-SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS = 180
+SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS = 60
 if (
     isinstance(SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS, bool)
     or not isinstance(SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS, (int, float))
