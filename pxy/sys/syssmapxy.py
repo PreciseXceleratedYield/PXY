@@ -47,7 +47,8 @@ def get_sma(
         raise ValueError("variant must be SMA or TSMA.")
     if df is None or df.empty or len(df) < period:
         return {"value": 0.0, "status": "NA", "period": period, "variant": variant}
-    df = df.copy()
+    from sysdthapxy import transform_dtha_ohlc
+    df = transform_dtha_ohlc(df)
     column = "SMA" if variant == "SMA" else "TSMA"
     df[column] = calculate_moving_average(df["Close"], period=period, variant=variant)
     close_arr = df['Close'].to_numpy()
@@ -86,6 +87,8 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     if df is None or df.empty or len(df) < SYSSMAPXY_MA_PERIOD:
         print("Invalid data. Cannot dump single candle JSON.")
         return
+    from sysdthapxy import transform_dtha_ohlc
+    df = transform_dtha_ohlc(df)
     # 1. Grab the configured moving-average window for the range boundaries.
     window = df.iloc[-SYSSMAPXY_MA_PERIOD:]
     # 2. Extract values (opening price remains delinked from the average).
