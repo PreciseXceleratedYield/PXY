@@ -129,6 +129,12 @@ def get_all_data():
         "market_data_available": core.get(
             "market_data_available", False
         ),
+        "market_data_fresh": core.get("market_data_fresh", False),
+        "market_data_stale": core.get("market_data_stale", True),
+        "market_data_source": core.get("market_data_source", "UNKNOWN"),
+        "market_data_fallback": core.get("market_data_fallback", False),
+        "market_data_timestamp": core.get("market_data_timestamp"),
+        "market_data_age_seconds": core.get("market_data_age_seconds"),
 
         # ===== NEW =====
         "candle_visual": core.get("candle_visual", ""),
