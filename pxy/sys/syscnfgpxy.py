@@ -308,7 +308,7 @@ if SYSPLCHRTPXY_OHLC_MODE not in {1, 2, 3, 4, 5, 6}:
 # ATR lookback for the primary Supertrend.
 SYSDTSTPXY_ST1_PERIOD = 1
 # ATR multiplier for the primary Supertrend.
-SYSDTSTPXY_ST1_FACTOR = 0.5
+SYSDTSTPXY_ST1_FACTOR = 0.35
 
 # BOS morning recognition ends at 10:10; its opening boundary uses the shared
 # exchange open above.
