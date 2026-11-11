@@ -1,5 +1,6 @@
 #sysdirpxy.py
 import pandas as pd
+from sysdthapxy import transform_dtha_ohlc
 from colorama import Fore, Style, init
 
 # Initialize Colorama
@@ -34,6 +35,7 @@ def detect_raw_direction(df: pd.DataFrame) -> tuple:
     if df is None or len(df) < 2:
         return (None, "NONE")
 
+    df = transform_dtha_ohlc(df)
     # Extract the last two rows (C1 and C0)
     c1_row = df.iloc[-2]  # Previous completed candle
     c0_row = df.iloc[-1]  # Current running candle
