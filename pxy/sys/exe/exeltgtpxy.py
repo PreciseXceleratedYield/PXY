@@ -133,8 +133,8 @@ def calculate_tgt(
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
 
         if not is_aligned:
-            # Both-side non-aligned target decreases with own position count.
-            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X / max(1, own_count))
+            # Both-side non-aligned target matches single-side non-aligned: X / 10.
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X / 10.0)
 
         # Aligned positions use the same target formula whether one or both sides are open.
         both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
