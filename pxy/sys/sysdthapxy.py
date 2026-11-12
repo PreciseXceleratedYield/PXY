@@ -32,10 +32,10 @@ def _dtha_ohlc_signature(df):
 
 
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
-    """Transform raw market OHLC once using one of eight pure candle modes."""
-    valid_modes = {"RAW", "OC2", "LH2", "PIPE", "OCC3", "OHLC4", "HKIN", "HYPR"}
+    """Transform raw market OHLC once using one of nine pure candle modes."""
+    valid_modes = {"RAW", "OC2", "LH2", "PIPE", "OCC3", "OHLC4", "HKIN", "HYPR", "TSMA"}
     if mode not in valid_modes:
-        raise ValueError("DTHA mode must be RAW, OC2, LH2, PIPE, OCC3, OHLC4, HKIN, or HYPR.")
+        raise ValueError("DTHA mode must be RAW, OC2, LH2, PIPE, OCC3, OHLC4, HKIN, HYPR, or TSMA.")
 
     if df is None or df.empty:
         return df
@@ -76,6 +76,29 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
     if mode == "RAW":
+        out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
+        return out
+
+    if mode == "TSMA":
+        # Seven-period linear-regression TSMA candle body, using raw inputs.
+        tsma_open = calculate_moving_average(
+            pd.Series(raw_open, index=out.index),
+            period=SYSSMAPXY_TSMA_PERIOD, variant="TSMA"
+        ).to_numpy(dtype=float)
+        tsma_close = calculate_moving_average(
+            pd.Series(raw_close, index=out.index),
+            period=SYSSMAPXY_TSMA_PERIOD, variant="TSMA"
+        ).to_numpy(dtype=float)
+        synthetic_close = (tsma_open + raw_open + tsma_close + raw_close) / 4.0
+        # The first candles may lack a full TSMA lookback; use raw close.
+        synthetic_close = np.where(np.isfinite(synthetic_close), synthetic_close, raw_close)
+        synthetic_open = np.concatenate(([raw_open[0]], synthetic_close[:-1]))
+        out["Open"] = synthetic_open
+        out["Close"] = synthetic_close
+        out["High"] = np.maximum.reduce((raw_high, synthetic_open, synthetic_close))
+        out["Low"] = np.minimum.reduce((raw_low, synthetic_open, synthetic_close))
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
