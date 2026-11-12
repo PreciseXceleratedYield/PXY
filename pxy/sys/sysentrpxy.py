@@ -51,7 +51,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     else:
         now_time = now
 
-    # Morning direction override uses raw DTAF candles, independent of DTHA.
+    # Morning direction override uses MRNG's PIPE transformation of raw DTAF candles, independent of DTHA.
     # Master liquidation, cooldown, and entry-time restrictions still take precedence.
     if ENTRY_START <= now_time < MORNING_OVERRIDE_END:
         try:
