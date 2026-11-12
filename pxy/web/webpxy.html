@@ -1545,8 +1545,10 @@ function groupWebPxyCycles(data,cycleState){
         const hasRiskCycle=riskCycle!==undefined;
         const cycleId=t.Cycle_ID;
         const hasCycleId=cycleId!==null&&cycleId!==undefined&&cycleId!=='';
-        const id=hasRiskCycle?String(riskCycle.id):hasCycleId?String(cycleId):'';
-        const key=hasRiskCycle?'risk-cycle-'+id:hasCycleId?'cycle-'+id:'unassigned-'+index;
+        // Ledger Cycle_ID is authoritative: closing a trade does not move it
+        // into the preceding cycle even if tag/time heuristics overlap.
+        const id=hasCycleId?String(cycleId):hasRiskCycle?String(riskCycle.id):'';
+        const key=hasCycleId?'cycle-'+id:hasRiskCycle?'risk-cycle-'+id:'unassigned-'+index;
         if(!cycles.has(key))cycles.set(key,{
             key,id,legacy:!hasRiskCycle&&!hasCycleId,risk:hasRiskCycle,
             trades:[],pnl:0,open:false,sortTime:0,firstTag:String(t.Tag||'')
