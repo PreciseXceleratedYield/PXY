@@ -91,6 +91,11 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
             period=SYSSMAPXY_TSMA_PERIOD, variant="TSMA"
         ).to_numpy(dtype=float)
         # Restore the independent candle construction from yesterday's backup.
+        # TSMA needs seven bars; retain valid raw candles during warm-up.
+        # Without this, the first six OHLC rows become NaN and the strict
+        # DTHA validator rejects the entire frame on a subsequent pass.
+        tsma_open = np.where(np.isfinite(tsma_open), tsma_open, raw_open)
+        tsma_close = np.where(np.isfinite(tsma_close), tsma_close, raw_close)
         candle_open = (tsma_open + raw_open) / 2.0
         blended_close = (tsma_close + raw_close) / 2.0
         candle_close = (candle_open + blended_close) / 2.0
