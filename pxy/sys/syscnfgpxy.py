@@ -172,10 +172,12 @@ if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "LH2", "PIPE", "OCC3", "HKIN", "
         "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, LH2, PIPE, OCC3, HKIN, OHLC4, HYPR, or TSMA."
     )
 
-# Switch or algorithm selection for signal mode.
-SYSINPXY_SIGNAL_MODE = "TSMA"
-# Switch or algorithm selection for signal mode.
-SYSOUTPXY_SIGNAL_MODE = "TSMA"
+# Original IN/OUT choices apply to all non-TSMA DTHA candle modes.
+SYSINPXY_ORIGINAL_SIGNAL_MODE = "SUPR"
+SYSOUTPXY_ORIGINAL_SIGNAL_MODE = "SUPR"
+# TSMA DTHA is a linked preset; switching away restores original choices.
+SYSINPXY_SIGNAL_MODE = "TSMA" if SYSDTHAPXY_CANDLE_MODE == "TSMA" else SYSINPXY_ORIGINAL_SIGNAL_MODE
+SYSOUTPXY_SIGNAL_MODE = "TSMA" if SYSDTHAPXY_CANDLE_MODE == "TSMA" else SYSOUTPXY_ORIGINAL_SIGNAL_MODE
 if SYSINPXY_SIGNAL_MODE not in {"TSMA", "SUPR"}:
     raise ValueError("SYSINPXY_SIGNAL_MODE must be TSMA or SUPR.")
 if SYSOUTPXY_SIGNAL_MODE not in {"TSMA", "SUPR"}:
