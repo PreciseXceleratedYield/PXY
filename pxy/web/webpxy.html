@@ -1662,7 +1662,44 @@ async function loadTrades(){
 /* ── RISK BAR ── */
 let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:0,active_target_line:0,pnl_offset:0,booked_profit:0,closed_cycle_count:0,last_closed_snapshot:null,updated_timestamp:''};
 async function loadRisk(){
-    try{riskData=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
+    try{
+        const [state, trades] = await Promise.all([
+            fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json()),
+            fetch('/api/web-data/webpnlpxy?_='+Date.now()).then(r=>r.json())
+        ]);
+        riskData=state;
+        // Display reconciliation only. Risk thresholds, exit decisions and persisted
+        // RiskBar state remain owned by the Python risk engine.
+        if(Array.isArray(trades) && trades.length){
+            const cycles=new Map();
+            let valid=true;
+            for(const trade of trades){
+                const id=Number(trade.Cycle_ID);
+                if(!Number.isSafeInteger(id)||id<1){valid=false;break;}
+                const status=String(trade.Status||'').toUpperCase();
+                if(status!=='OPEN'&&status!=='CLOSED'){valid=false;break;}
+                const pnl=Number(trade.PNL);
+                if(!Number.isFinite(pnl)){valid=false;break;}
+                if(!cycles.has(id))cycles.set(id,{pnl:0,open:false});
+                const cycle=cycles.get(id);
+                cycle.pnl+=pnl;
+                if(status==='OPEN')cycle.open=true;
+            }
+            if(valid && cycles.size){
+                const completed=[...cycles.values()].filter(c=>!c.open);
+                const active=[...cycles.values()].filter(c=>c.open);
+                if(active.length<=1){
+                    riskData={...state,
+                        booked_profit:completed.reduce((sum,c)=>sum+c.pnl,0),
+                        closed_cycle_count:completed.length,
+                        current_net_pnl:active.length?active[0].pnl:0
+                    };
+                }
+            }
+        }
+    }catch(e){
+        // If trade data is missing or malformed, retain the engine's own values.
+    }
     const peak=Math.round(riskData.session_peak_pnl??0);
     const net=Math.round(riskData.current_net_pnl??0);
     // No active cycle: show zero thresholds without altering backend risk controls.
