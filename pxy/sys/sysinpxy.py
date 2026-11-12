@@ -39,17 +39,19 @@ def get_signal(df=None):
         if SYSINPXY_SIGNAL_MODE == "SUPR":
             return get_supr_signals(df)[0]
 
-        if SYSINPXY_SIGNAL_MODE != "TSMA":
+        if SYSINPXY_SIGNAL_MODE not in {"TSMAC0", "TSMAC1"}:
             return "NONE"
 
         transformed = transform_dtha_ohlc(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
-        # Confirm a completed-candle flip with the live running candle.
+        # TSMAC0 follows the running candle directly; TSMAC1 retains the existing confirmation.
         # C2 and C1 are completed candles; C0 is the forming candle.
-        if len(closes) < 4:
+        if len(closes) < (2 if SYSINPXY_SIGNAL_MODE == "TSMAC0" else 4):
             return "NONE"
 
         directions = get_close_direction_series(closes)
+        if SYSINPXY_SIGNAL_MODE == "TSMAC0":
+            return {"UP": "BUY", "DOWN": "SELL"}.get(directions.iloc[-1], "NONE")
         past_completed = directions.iloc[-3]
         latest_completed = directions.iloc[-2]
         running = directions.iloc[-1]
