@@ -1498,26 +1498,8 @@ new ResizeObserver(()=>{
 }).observe($('tradeChartBox'));
 
 /* ── TRADES — wire click ── */
-async function loadTrades(){
-    let data=[],cycleState={};
-    [data,cycleState]=await Promise.all([
-        fetch('/api/web-data/webpnlpxy?_='+Date.now()).then(r=>r.json()).catch(()=>[]),
-        fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json()).catch(()=>({}))
-    ]);
-    const total=data.reduce((s,d)=>s+(String(d.Status||'CLOSED').toUpperCase()==='OPEN'?0:Number(d.PNL)||0),0);
-    const tradePnlChanged=prevTradePnl!==null&&total!==prevTradePnl;
-    const tradePnlUp=tradePnlChanged&&total>prevTradePnl;
-    bookedTotal=total;
-    refreshRiskCandle();
-    const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
-    const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
-    if(tradePnlChanged){flashEl(lbl,tradePnlUp?'flash-up':'flash-down');flashEl(b,tradePnlUp?'flash-up':'flash-down');}
-    prevTradePnl=total;
-    const scroll=$('tradeScroll');
-    const trPrevScrollTop=scroll.scrollTop;
-    scroll.querySelectorAll('.t-row,.t-cycle-row,.t-cycle-details').forEach(r=>r.remove());
-    if(!data.length){$('tradeEmpty').style.display='block';return;}
-    $('tradeEmpty').style.display='none';
+// Single source of cycle grouping for both trade rows and RiskBar display.
+function groupWebPxyCycles(data,cycleState){
     let riskCycles=Array.isArray(cycleState.closed_cycles)?cycleState.closed_cycles:[];
     if(!riskCycles.length&&cycleState.last_closed_snapshot){
         riskCycles=[{
@@ -1576,7 +1558,30 @@ async function loadTrades(){
         const time=Date.parse(t.Exit_Time==='OPEN'?t.Buy_Time:t.Exit_Time||t.Buy_Time||'');
         if(Number.isFinite(time))book.sortTime=Math.max(book.sortTime,time);
     });
-    const cycleList=[...cycles.values()];
+    return [...cycles.values()];
+}
+
+async function loadTrades(){
+    let data=[],cycleState={};
+    [data,cycleState]=await Promise.all([
+        fetch('/api/web-data/webpnlpxy?_='+Date.now()).then(r=>r.json()).catch(()=>[]),
+        fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json()).catch(()=>({}))
+    ]);
+    const total=data.reduce((s,d)=>s+(String(d.Status||'CLOSED').toUpperCase()==='OPEN'?0:Number(d.PNL)||0),0);
+    const tradePnlChanged=prevTradePnl!==null&&total!==prevTradePnl;
+    const tradePnlUp=tradePnlChanged&&total>prevTradePnl;
+    bookedTotal=total;
+    refreshRiskCandle();
+    const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
+    const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
+    if(tradePnlChanged){flashEl(lbl,tradePnlUp?'flash-up':'flash-down');flashEl(b,tradePnlUp?'flash-up':'flash-down');}
+    prevTradePnl=total;
+    const scroll=$('tradeScroll');
+    const trPrevScrollTop=scroll.scrollTop;
+    scroll.querySelectorAll('.t-row,.t-cycle-row,.t-cycle-details').forEach(r=>r.remove());
+    if(!data.length){$('tradeEmpty').style.display='block';return;}
+    $('tradeEmpty').style.display='none';
+    const cycleList=groupWebPxyCycles(data,cycleState);
     cycleList.sort((a,b)=>{
         if(a.open!==b.open)return a.open?-1:1;
         let v;
@@ -1671,30 +1676,17 @@ async function loadRisk(){
         // Display reconciliation only. Risk thresholds, exit decisions and persisted
         // RiskBar state remain owned by the Python risk engine.
         if(Array.isArray(trades) && trades.length){
-            const cycles=new Map();
-            let valid=true;
-            for(const trade of trades){
-                const id=Number(trade.Cycle_ID);
-                if(!Number.isSafeInteger(id)||id<1){valid=false;break;}
-                const status=String(trade.Status||'').toUpperCase();
-                if(status!=='OPEN'&&status!=='CLOSED'){valid=false;break;}
-                const pnl=Number(trade.PNL);
-                if(!Number.isFinite(pnl)){valid=false;break;}
-                if(!cycles.has(id))cycles.set(id,{pnl:0,open:false});
-                const cycle=cycles.get(id);
-                cycle.pnl+=pnl;
-                if(status==='OPEN')cycle.open=true;
-            }
-            if(valid && cycles.size){
-                const completed=[...cycles.values()].filter(c=>!c.open);
-                const active=[...cycles.values()].filter(c=>c.open);
-                if(active.length<=1){
-                    riskData={...state,
-                        booked_profit:completed.reduce((sum,c)=>sum+c.pnl,0),
-                        closed_cycle_count:completed.length,
-                        current_net_pnl:active.length?active[0].pnl:0
-                    };
-                }
+            const cycles=groupWebPxyCycles(trades,state);
+            // Match the displayed trade-cycle rows exactly. Never mix independent
+            // Cycle_ID accounting with RiskBar's tag/time-based cycle grouping.
+            const completed=cycles.filter(c=>!c.open);
+            const active=cycles.filter(c=>c.open);
+            if(cycles.length && active.length<=1 && cycles.every(c=>!c.legacy)){
+                riskData={...state,
+                    booked_profit:completed.reduce((sum,c)=>sum+c.pnl,0),
+                    closed_cycle_count:completed.length,
+                    current_net_pnl:active.length?active[0].pnl:0
+                };
             }
         }
     }catch(e){
