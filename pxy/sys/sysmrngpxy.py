@@ -1,15 +1,13 @@
 # sysmrngpxy.py
-"""Morning-only direction from PIPE-transformed DTAF candles."""
+"""Morning-only direction from raw DTAF candles (independent of DTHA)."""
 
 import pandas as pd
 
-from sysdthapxy import transform_dtha_ohlc
-
 
 def get_morning_direction():
-    """Compare the last two PIPE-transformed DTAF candle close values.
+    """Compare the last two raw DTAF candle close values.
 
-    Returns (latest_pipe_close, UP/DOWN/NONE). The input is never mutated.
+    Returns (latest_raw_close, UP/DOWN/NONE). The input is never mutated.
     The running candle is included, matching the existing morning override.
     """
     from sysdtafpxy import fetch_yf_data
@@ -17,7 +15,7 @@ def get_morning_direction():
     if df is None or len(df) < 2 or not {"Open", "Close"}.issubset(df.columns):
         return None, "NONE"
 
-    candles = transform_dtha_ohlc(df, mode="PIPE")
+    candles = df
     if candles["Close"].iloc[-2:].isna().any():
         return None, "NONE"
     previous_close = candles["Close"].iloc[-2]
