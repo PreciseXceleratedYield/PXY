@@ -13,7 +13,6 @@ from syscnfgpxy import (
     EXEAMSPXY_MAX_INVESTMENT,
     EXEAVXPXY_MARKET_END as MARKET_END,
     EXEAVXPXY_MARKET_START as MARKET_START,
-    EXEAVXPXY_REBUY_ENABLED as REBUY_ENABLED,
     EXEAVXPXY_USE_OVERALL_LOSS,
 )
 from sysdcinpxy import (
@@ -122,7 +121,7 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
     now = datetime.now(IST).time()
     # Always calculate and publish dashboard thresholds for open positions.
     # Trading eligibility is checked separately before any averaging order.
-    can_average = averaging_window_enabled(REBUY_ENABLED, now, MARKET_START, MARKET_END)
+    can_average = averaging_window_enabled(True, now, MARKET_START, MARKET_END)
 
     working_df = df.copy()
     working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper()

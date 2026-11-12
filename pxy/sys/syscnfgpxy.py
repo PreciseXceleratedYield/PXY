@@ -450,8 +450,6 @@ EXEFORCEPXY_ORDER_AMO = SYSCNFGPXY_FO_ORDER_AMO
 # ================================================================
 # Switch or algorithm selection for use overall loss.
 EXEAVXPXY_USE_OVERALL_LOSS = True
-# Switch or algorithm selection for rebuy enabled.
-EXEAVXPXY_REBUY_ENABLED = False
 # Session boundary controlling market start.
 EXEAVXPXY_MARKET_START = SYSCNFGPXY_AVERAGING_START
 # Session boundary controlling market end.

@@ -19,6 +19,9 @@ for path in (RUN_DIR, HERE, SYS_DIR):
 
 from syshdaypxy import is_nse_fo_trading_day
 
+# Master averaging pipeline switch. False prevents launching exeavgpxy.py entirely.
+AVERAGING_PIPE_ENABLED = False
+
 # Component failures are reported periodically; they never stop the engine.
 COMPONENT_FAILURES = {}
 ENGINE_ITERATION = 0
@@ -116,7 +119,8 @@ def run_market_cycle():
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeentrpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
-    safe_run(HERE / "exeavgpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    if AVERAGING_PIPE_ENABLED:
+        safe_run(HERE / "exeavgpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     fancy_pause(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
 

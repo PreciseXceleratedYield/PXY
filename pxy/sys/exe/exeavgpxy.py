@@ -15,14 +15,11 @@ from execoolpxy import liquidation_pending
 from exeavxpxy import handle_side_averaging
 from exeexppxy import dump_idle_json
 from sysdcinpxy import averaging_snapshot_status
-from syscnfgpxy import EXEAVGPXY_IDLE_EXIT_MODE as EXIT_MODE, EXEAVXPXY_REBUY_ENABLED
+from syscnfgpxy import EXEAVGPXY_IDLE_EXIT_MODE as EXIT_MODE
 
 init(autoreset=True)
 
 def run_snapshot():
-    # Master averaging switch: skip the entire pipeline before broker/data work.
-    if not EXEAVXPXY_REBUY_ENABLED:
-        return
     if liquidation_pending():
         print(f"{Fore.YELLOW}🛑 Master risk liquidation pending; averaging is blocked.")
         return
