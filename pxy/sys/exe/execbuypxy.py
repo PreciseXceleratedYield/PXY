@@ -131,7 +131,7 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     price  -> price supplied in remaining_df
 
     ATM / ITM -> 0
-    OTM       -> full absolute distance until 09:30; half afterward, rounded to 100
+    OTM       -> full absolute distance at all times, rounded to 100
     """
 
     if remaining_df is None or remaining_df.empty:
@@ -195,11 +195,8 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     if option_type == "PE" and strike > spot:
         return 0
 
-    # Counter-buy: full absolute strike-to-price gap before 09:30,
-    # then half the gap from 09:30 onward.
-    now_time = datetime.now(SYSCNFGPXY_TIMEZONE).time()
-    divisor = 1.0 if now_time < dt_time(9, 30) else 2.0
-    difference = abs(strike - spot) / divisor
+    # Use the full absolute strike-to-price gap at all times; no /2 adjustment.
+    difference = abs(strike - spot)
 
     # Preserve the existing strike-offset rounding to the nearest 100.
     offset_step = 100

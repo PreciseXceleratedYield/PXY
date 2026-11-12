@@ -545,7 +545,7 @@ EXESLPXY_MIN_PRICE = 2.0
 # Switch or algorithm selection for action.
 EXECBUYPXY_ACTION = "YES"
 # Switch or algorithm selection for use dynamic strike.
-EXECBUYPXY_USE_DYNAMIC_STRIKE = False
+EXECBUYPXY_USE_DYNAMIC_STRIKE = True
 if not isinstance(EXECBUYPXY_USE_DYNAMIC_STRIKE, bool):
     raise ValueError("EXECBUYPXY_USE_DYNAMIC_STRIKE must be True or False.")
 # Enables verbose diagnostic logging for this subsystem.
