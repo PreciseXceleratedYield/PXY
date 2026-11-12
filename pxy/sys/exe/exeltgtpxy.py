@@ -26,6 +26,7 @@ from syscnfgpxy import (
     EXETGTPXY_PRD_LATE_DAY_TIME,
     EXETGTPXY_PRD_MAX_TARGET_PCT,
     SYSCNFGPXY_TIMEZONE,
+    SYSDTHAPXY_CANDLE_MODE,
     X,
 )
 
@@ -131,6 +132,12 @@ def calculate_tgt(
                 else X / 10.0
             )
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
+
+        # TSMA preset: both-side aligned targets are effectively disabled at 99%,
+        # while both-side non-aligned targets use a fixed 1.4%.
+        # Other DTHA modes retain their original target formulas.
+        if both_sides_open and SYSDTHAPXY_CANDLE_MODE == "TSMA":
+            return EXETGTPXY_PRD_MAX_TARGET_PCT if is_aligned else 1.4
 
         if not is_aligned:
             # Both-side non-aligned target decreases with own position count.
