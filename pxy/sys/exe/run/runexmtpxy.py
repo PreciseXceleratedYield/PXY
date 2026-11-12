@@ -208,7 +208,7 @@ def cycle_risk_metrics(
     # NONE disables target-triggered exits; the minimum remains ₹100.
     # All calculations use only active and closed rows of the present cycle.
     target_multiplier = 1.0 if signal in {"SIDE", "BULL", "BEAR"} else 0.0
-    target_pct = float(target_pct) * target_multiplier
+    target_pct = 1.4 * target_multiplier
     investment_target = premium_paid * target_pct / 100.0
     minimum_pnl = 100.0
     target = max(investment_target, minimum_pnl)
