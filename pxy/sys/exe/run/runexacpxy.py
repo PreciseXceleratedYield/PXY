@@ -385,6 +385,37 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     )
     active_cycle_id = closed_cycle_count + 1
     print(format_cycle_status(active_cycle_id, risk_target))
+    # Explain a displayed profit breach that cannot initiate a RiskBar exit.
+    # Diagnostic only: no changes to order execution or liquidation gates.
+    if metrics["cycle_pnl"] >= risk_target and not metrics["target_reached"]:
+        reasons = []
+        if not RISK_CANDLE_CONTROL_ENABLED:
+            reasons.append("controller disabled")
+        if not RUNEXACPXY_TARGET_SQUAREOFF_ENABLED:
+            reasons.append("target square-off disabled")
+        if not metrics["both_sides_open"]:
+            reasons.append("both CE and PE must be open")
+        if str(exit_signal).upper().strip() not in {"SIDE", "BULL", "BEAR"}:
+            reasons.append("OUT signal not SIDE/BULL/BEAR")
+        if metrics["premium_paid"] <= 0:
+            reasons.append("cycle premium missing")
+        if metrics["cycle_trade_count"] <= 0:
+            reasons.append("no matched cycle trade rows")
+        print(
+            f"{Fore.YELLOW}⚠️ RiskBar target displayed but exit ineligible: "
+            f"cycle_pnl=₹{metrics['cycle_pnl']:.2f}, "
+            f"target=₹{risk_target:.2f}, "
+            f"premium=₹{metrics['premium_paid']:.2f}, "
+            f"signal={exit_signal}, reasons={', '.join(reasons) or 'unresolved'}"
+        )
+    elif metrics["cycle_pnl"] >= risk_target and not risk_enabled:
+        print(
+            f"{Fore.YELLOW}⚠️ RiskBar target reached but controller inactive: "
+            f"cycle_pnl=₹{metrics['cycle_pnl']:.2f}, target=₹{risk_target:.2f}, "
+            f"both_sides_open={metrics['both_sides_open']}, "
+            f"controller={RISK_CANDLE_CONTROL_ENABLED}, "
+            f"target_squareoff={RUNEXACPXY_TARGET_SQUAREOFF_ENABLED}"
+        )
 
     if not risk_enabled:
         if consecutive_breaches:
