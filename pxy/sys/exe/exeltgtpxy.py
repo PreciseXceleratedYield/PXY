@@ -136,7 +136,11 @@ def calculate_tgt(
             # Non-aligned target is fixed at X/10, independent of position count.
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X / 10.0)
 
-        # Aligned positions use the same target formula whether one or both sides are open.
+        # When both CE and PE are open, aligned positions use the 99% target.
+        if both_sides_open:
+            return EXETGTPXY_PRD_MAX_TARGET_PCT
+
+        # Preserve the existing aligned fallback for other cases.
         both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
         target_pct = (
             both_sides_base
