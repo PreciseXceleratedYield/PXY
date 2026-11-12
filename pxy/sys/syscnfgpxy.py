@@ -173,9 +173,9 @@ if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "LH2", "PIPE", "OCC3", "HKIN", "
     )
 
 # Switch or algorithm selection for signal mode.
-SYSINPXY_SIGNAL_MODE = "SUPR"
+SYSINPXY_SIGNAL_MODE = "TSMA"
 # Switch or algorithm selection for signal mode.
-SYSOUTPXY_SIGNAL_MODE = "SUPR"
+SYSOUTPXY_SIGNAL_MODE = "TSMA"
 if SYSINPXY_SIGNAL_MODE not in {"TSMA", "SUPR"}:
     raise ValueError("SYSINPXY_SIGNAL_MODE must be TSMA or SUPR.")
 if SYSOUTPXY_SIGNAL_MODE not in {"TSMA", "SUPR"}:
