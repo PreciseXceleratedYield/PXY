@@ -133,8 +133,8 @@ def calculate_tgt(
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
 
         if not is_aligned:
-            # Non-aligned target is fixed at X/10, independent of position count.
-            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X / 10.0)
+            # Both-side non-aligned target is 99/X, independent of position count.
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_MAX_TARGET_PCT / X)
 
         # When both CE and PE are open, aligned positions use the 99% target.
         if both_sides_open:
