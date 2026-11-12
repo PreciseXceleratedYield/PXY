@@ -82,7 +82,6 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         return out
 
     if mode == "TSMA":
-        # Seven-period linear-regression TSMA candle body, using raw inputs.
         tsma_open = calculate_moving_average(
             pd.Series(raw_open, index=out.index),
             period=SYSSMAPXY_TSMA_PERIOD, variant="TSMA"
@@ -91,14 +90,14 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
             pd.Series(raw_close, index=out.index),
             period=SYSSMAPXY_TSMA_PERIOD, variant="TSMA"
         ).to_numpy(dtype=float)
-        synthetic_close = (tsma_open + raw_open + tsma_close + raw_close) / 4.0
-        # The first candles may lack a full TSMA lookback; use raw close.
-        synthetic_close = np.where(np.isfinite(synthetic_close), synthetic_close, raw_close)
-        synthetic_open = np.concatenate(([raw_open[0]], synthetic_close[:-1]))
-        out["Open"] = synthetic_open
-        out["Close"] = synthetic_close
-        out["High"] = np.maximum.reduce((raw_high, synthetic_open, synthetic_close))
-        out["Low"] = np.minimum.reduce((raw_low, synthetic_open, synthetic_close))
+        # Restore the independent candle construction from yesterday's backup.
+        candle_open = (tsma_open + raw_open) / 2.0
+        blended_close = (tsma_close + raw_close) / 2.0
+        candle_close = (candle_open + blended_close) / 2.0
+        out["Open"] = candle_open
+        out["Close"] = candle_close
+        out["High"] = np.maximum(candle_open, candle_close)
+        out["Low"] = np.minimum(candle_open, candle_close)
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
