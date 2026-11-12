@@ -34,7 +34,7 @@ def get_signal(df=None):
         if SYSOUTPXY_SIGNAL_MODE == "SUPR":
             return get_supr_signals(df)[1]
 
-        if SYSOUTPXY_SIGNAL_MODE != "TSMA":
+        if SYSOUTPXY_SIGNAL_MODE not in {"TSMAC0", "TSMAC1"}:
             return "NONE"
 
         transformed = get_out_candles(df)
@@ -42,10 +42,12 @@ def get_signal(df=None):
 
         # Compare the latest completed candle with the live running candle.
         # Candle direction is determined by transformed close vs previous close.
-        if len(closes) < 3:
-            return "SIDE"
+        if len(closes) < (2 if SYSOUTPXY_SIGNAL_MODE == "TSMAC0" else 3):
+            return "NONE" if SYSOUTPXY_SIGNAL_MODE == "TSMAC0" else "SIDE"
 
         directions = get_close_direction_series(closes)
+        if SYSOUTPXY_SIGNAL_MODE == "TSMAC0":
+            return {"UP": "BULL", "DOWN": "BEAR"}.get(directions.iloc[-1], "NONE")
         completed_direction = directions.iloc[-2]
         running_direction = directions.iloc[-1]
         if completed_direction == "UP" and running_direction == "UP":
