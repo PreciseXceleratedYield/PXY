@@ -348,6 +348,24 @@ def get_stma_signals(df, include_running=None):
     return neutral
 
 
+def get_pipe_binary_direction(df):
+    """Direction of latest valid PIPE candle, carrying direction across doji candles.
+
+    Missing/invalid history returns None rather than inventing a trading signal.
+    """
+    transformed = transform_dtha_ohlc(df, mode="PIPE")
+    opens = pd.to_numeric(transformed["Open"], errors="coerce")
+    closes = pd.to_numeric(transformed["Close"], errors="coerce")
+    for opening, closing in zip(reversed(opens.tolist()), reversed(closes.tolist())):
+        if not (np.isfinite(opening) and np.isfinite(closing)):
+            continue
+        if closing > opening:
+            return "BULL"
+        if closing < opening:
+            return "BEAR"
+    return None
+
+
 def get_close_direction_series(closes):
     """Return each close's direction relative to the preceding close."""
     close_series = pd.to_numeric(pd.Series(closes), errors="coerce")
