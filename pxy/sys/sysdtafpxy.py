@@ -216,25 +216,13 @@ def _continuous_signal_candles(yahoo, interval, target_rows):
     chosen = "YAHOO" if yahoo_fresh else ("FUTURES" if quote else "STALE")
 
     if chosen == "YAHOO":
-        # On return to Yahoo, anchor the first unseen Yahoo bar to the
-        # previously published close. Never rewrite earlier futures candles.
-        unseen = yahoo[yahoo.index > last_time]
-        if not unseen.empty:
-            if source != "YAHOO":
-                first = unseen.iloc[0]
-                offset = last_close - float(first["Open"])
-            for stamp, row in unseen.iterrows():
-                vals = [float(row[field]) + offset for field in fields]
-                if all(math.isfinite(v) and v > 0 for v in vals):
-                    history.append((stamp, vals))
-            source = "YAHOO"
-        elif source == "YAHOO":
-            # Update an in-progress Yahoo bar, retaining its existing offset.
-            if last_time == last_yahoo:
-                row = yahoo.iloc[-1]
-                history[-1] = (last_time, [float(row[field]) + offset for field in fields])
-        # If Yahoo recovers within an already published futures minute,
-        # keep that minute unchanged and switch at the next Yahoo minute.
+        # Fresh Yahoo is authoritative. Discard persisted futures-adjusted
+        # candles and offsets, including after restart or source recovery.
+        # This prevents JSON continuity state from shifting the index chart.
+        history = [(stamp, [float(row[field]) for field in fields])
+                   for stamp, row in yahoo.tail(max(target_rows, 90)).iterrows()]
+        source = "YAHOO"
+        offset = 0.0
     elif chosen == "FUTURES":
         price, stamp = quote
         minute = stamp.floor("min")
