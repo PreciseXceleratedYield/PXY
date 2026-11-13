@@ -47,7 +47,7 @@ def _warn_once(key, msg):
 
 # === SURGICAL CHANGE START (Error Fallbacks Added) ===
 def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=0.0, pe_investment=0.0, ce_pnl_pct=0.0, pe_pnl_pct=0.0):
-    """Negative LGT based on opposite worth, signed PNL percentage, and count."""
+    """Signed LGT based on opposite worth, signed PNL percentage, and count."""
     try:
         opposite_count = float(pe_count if is_ce else ce_count)
         own_worth = float(ce_investment if is_ce else pe_investment)
@@ -61,7 +61,7 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
 
         raw_lgt = -(float(X) * (opposite_worth / own_worth)
                     + opposite_pnl_pct * max(0.0, opposite_count))
-        return max(-99.0, min(-0.01, raw_lgt))
+        return max(-99.0, min(99.0, raw_lgt))
 
     except (TypeError, ValueError, OverflowError, ZeroDivisionError) as e:
         _warn_once("lgt_err", f"Error in calculate_lgt: {e}. Falling back to -55.0.")
