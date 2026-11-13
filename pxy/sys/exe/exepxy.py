@@ -20,7 +20,7 @@ for path in (RUN_DIR, HERE, SYS_DIR):
 from syshdaypxy import is_nse_fo_trading_day
 
 # Master averaging pipeline switch. False prevents launching exeavgpxy.py entirely.
-AVERAGING_PIPE_ENABLED = False
+AVERAGING_PIPE_ENABLED = True
 
 # Component failures are reported periodically; they never stop the engine.
 COMPONENT_FAILURES = {}
