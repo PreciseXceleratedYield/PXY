@@ -33,9 +33,12 @@ from run.runexlckpxy import ledger_busy
 logger = logging.getLogger("exeavxpxy")
 
 
-def averaging_alignment_signals(exit_signal):
-    """Select the averaging side from the exit signal alone."""
-    return is_aligned("CE", exit_signal), is_aligned("PE", exit_signal)
+def averaging_alignment_signals(exit_signal, tsma_direction="NA"):
+    """Allow either configured OUT or independent TSMA to favor a side."""
+    return (
+        is_aligned("CE", exit_signal) or is_aligned("CE", tsma_direction),
+        is_aligned("PE", exit_signal) or is_aligned("PE", tsma_direction),
+    )
 
 
 def _side_target_pct(rows, ce_investment=0, pe_investment=0, ce_count=0, pe_count=0, is_ce=True):
@@ -114,7 +117,7 @@ def print_telemetry_dashboard(p):
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
 
-def handle_side_averaging(client, df, index_price, positions_response=None):
+def handle_side_averaging(client, df, index_price, positions_response=None, tsma_direction="NA"):
     """Runs System A (averaging) each cycle. Exits and counter-buys live in the exit pipe."""
     if df is None or df.empty:
         return
@@ -162,7 +165,7 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
 
     # 🎯 STEP POSITIONS FIXED: Parse variable status first
     active_exit = str(working_df.iloc[-1].get("exit", "NONE")).upper().strip()
-    ce_aligned, pe_aligned = averaging_alignment_signals(active_exit)
+    ce_aligned, pe_aligned = averaging_alignment_signals(active_exit, str(tsma_direction).upper().strip())
     ce_opposite_signal = active_exit in {"BULL", "BEAR"} and not ce_aligned
     pe_opposite_signal = active_exit in {"BULL", "BEAR"} and not pe_aligned
 
