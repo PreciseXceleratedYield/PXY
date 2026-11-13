@@ -133,8 +133,8 @@ def calculate_tgt(
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
 
         if not is_aligned:
-            # Both-side non-aligned target scales inversely with own depth.
-            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_MAX_TARGET_PCT / own_depth)
+            # Both-side non-aligned target is fixed at 1.4%.
+            return 1.4
 
         # When both CE and PE are open, aligned positions use the 99% target.
         if both_sides_open:
