@@ -174,6 +174,8 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
         pe_count=pe_lots,
         ce_investment=ce_lgt_worth,
         pe_investment=pe_lgt_worth,
+        ce_pnl_pct=ce_overall_pnl_pct,
+        pe_pnl_pct=pe_overall_pnl_pct,
     )
     
     pe_dynamic_threshold = calculate_lgt(
@@ -183,6 +185,8 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
         pe_count=pe_lots,
         ce_investment=ce_lgt_worth,
         pe_investment=pe_lgt_worth,
+        ce_pnl_pct=ce_overall_pnl_pct,
+        pe_pnl_pct=pe_overall_pnl_pct,
     )
     # === SURGICAL LINE REPLACEMENT END ===
     if USE_OVERALL_LOSS:
