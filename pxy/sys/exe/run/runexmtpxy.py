@@ -222,10 +222,10 @@ def cycle_risk_metrics(
         or (heavy_side == "PE" and signal == "BEAR")
     )
 
-    # SIDE, BULL, and BEAR use the same 1.4% cycle profit target.
-    # NONE disables target-triggered exits; the minimum remains ₹100.
+    # RiskBar uses the same 1.4% cycle profit target regardless of OUT signal.
+    # The minimum remains ₹100.
     # All calculations use only active and closed rows of the present cycle.
-    target_multiplier = 1.0 if signal in {"SIDE", "BULL", "BEAR"} else 0.0
+    target_multiplier = 1.0
     target_pct = float(target_pct) * target_multiplier
     investment_target = premium_paid * target_pct / 100.0
     minimum_pnl = 100.0
