@@ -74,8 +74,7 @@ def run_snapshot():
         print(f"{Fore.YELLOW}⚠️ Broker snapshot unavailable; averaging skipped.")
         return
     handle_side_averaging(
-        client, df, index_price, positions_response=positions_response,
-        tsma_direction=str(market_snapshot.iloc[0].get("tsma", "NA")),
+        client, df, index_price, positions_response=positions_response
     )
 
 if __name__ == "__main__":
