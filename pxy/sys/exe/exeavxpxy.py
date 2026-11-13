@@ -148,12 +148,19 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
     ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
     pe_investment = float(pe_rows['row_invested'].sum()) if not pe_rows.empty else 0.0
 
-    # LGT ratio only: midpoint of buy and sell prices, weighted by quantity.
+    # LGT denominator: opposite worth uses midpoint of buy and sell prices.
+    # LGT numerator: own capital uses original buy price times quantity.
     working_df['row_lgt_worth'] = (
         working_df['qty'].apply(safe_float).clip(lower=0)
         * (working_df['buy_prc'].apply(safe_float).clip(lower=0)
            + working_df['sell_prc'].apply(safe_float).clip(lower=0)) / 2.0
     )
+    working_df['row_lgt_capital'] = (
+        working_df['qty'].apply(safe_float).clip(lower=0)
+        * working_df['buy_prc'].apply(safe_float).clip(lower=0)
+    )
+    ce_lgt_capital = float(working_df.loc[working_df['side'] == 'CE', 'row_lgt_capital'].sum())
+    pe_lgt_capital = float(working_df.loc[working_df['side'] == 'PE', 'row_lgt_capital'].sum())
     ce_lgt_worth = float(working_df.loc[working_df['side'] == 'CE', 'row_lgt_worth'].sum())
     pe_lgt_worth = float(working_df.loc[working_df['side'] == 'PE', 'row_lgt_worth'].sum())
 
@@ -174,6 +181,8 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
         pe_count=pe_lots,
         ce_investment=ce_lgt_worth,
         pe_investment=pe_lgt_worth,
+        ce_capital=ce_lgt_capital,
+        pe_capital=pe_lgt_capital,
         ce_pnl_pct=ce_overall_pnl_pct,
         pe_pnl_pct=pe_overall_pnl_pct,
     )
@@ -185,6 +194,8 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
         pe_count=pe_lots,
         ce_investment=ce_lgt_worth,
         pe_investment=pe_lgt_worth,
+        ce_capital=ce_lgt_capital,
+        pe_capital=pe_lgt_capital,
         ce_pnl_pct=ce_overall_pnl_pct,
         pe_pnl_pct=pe_overall_pnl_pct,
     )
