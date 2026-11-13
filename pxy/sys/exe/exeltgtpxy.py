@@ -88,6 +88,17 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
+        # Both-side targets use the same worth ratio regardless of OUT alignment.
+        if both_sides_open:
+            try:
+                own = float(own_worth)
+                opposite = float(opposite_worth)
+                if not (math.isfinite(own) and math.isfinite(opposite)) or own <= 0 or opposite <= 0:
+                    return 0.0
+                return X * (opposite / own)
+            except (TypeError, ValueError, OverflowError, ZeroDivisionError):
+                return 0.0
+
         # From the configured late-day cutoff (15:14 IST), set 99% target for every position,
         # regardless of alignment or whether one or both sides are open.
         if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
@@ -111,11 +122,9 @@ def calculate_tgt(
         # With only one active option side, use the higher of own power and own depth
         # from 09:15 until 15:14. The late-day override remains authoritative.
         if not both_sides_open and dt_time(9, 15) <= current_time < EXETGTPXY_PRD_LATE_DAY_TIME:
-            tsma = str(tsma_state or "").upper().strip()
-            tsma_aligned = (is_ce is True and tsma == "BULL") or (is_ce is False and tsma == "BEAR")
             target_pct = (
                 X / max(own_power, own_depth)
-                if tsma_aligned
+                if is_aligned
                 else X / 10.0
             )
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
