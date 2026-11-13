@@ -16,6 +16,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from datetime import time as dt_time
 from colorama import Fore, Style, init
 
 SYS_DIR = Path(__file__).resolve().parents[2]
@@ -379,7 +380,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     # Pending liquidations resume earlier in _tick regardless of signal.
     # New RiskBar liquidations can start regardless of OUT signal.
     risk_enabled = (
-        RISK_CANDLE_CONTROL_ENABLED
+        current_time >= dt_time(9, 30)
+        and RISK_CANDLE_CONTROL_ENABLED
         and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
         and metrics["both_sides_open"]
     )
@@ -389,6 +391,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     # Diagnostic only: no changes to order execution or liquidation gates.
     if metrics["cycle_pnl"] >= risk_target and not metrics["target_reached"]:
         reasons = []
+        if current_time < dt_time(9, 30):
+            reasons.append("RiskBar starts at 09:30 IST")
         if not RISK_CANDLE_CONTROL_ENABLED:
             reasons.append("controller disabled")
         if not RUNEXACPXY_TARGET_SQUAREOFF_ENABLED:
