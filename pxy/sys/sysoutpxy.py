@@ -45,7 +45,7 @@ def get_signal(df=None):
 
         # Compare the latest completed candle with the live running candle.
         # Candle direction is determined by transformed close vs previous close.
-        if len(closes) < (2 if SYSOUTPXY_SIGNAL_MODE == "TSMAC0" else 3):
+        if len(closes) < (2 if SYSOUTPXY_SIGNAL_MODE == "TSMAC0" else 4):
             return "NONE" if SYSOUTPXY_SIGNAL_MODE == "TSMAC0" else "SIDE"
 
         directions = get_close_direction_series(closes)
@@ -56,6 +56,13 @@ def get_signal(df=None):
         if completed_direction == "UP" and running_direction == "UP":
             return "BULL"
         if completed_direction == "DOWN" and running_direction == "DOWN":
+            return "BEAR"
+        # Match TSMAC1 IN reversal patterns on C2, C1, and live C0.
+        past_completed = directions.iloc[-3]
+        pattern = (past_completed, completed_direction, running_direction)
+        if pattern == ("UP", "DOWN", "UP"):
+            return "BULL"
+        if pattern == ("DOWN", "UP", "DOWN"):
             return "BEAR"
         return "SIDE"
     except Exception:
