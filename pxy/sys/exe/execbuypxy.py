@@ -207,7 +207,7 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
 
 # ---------------- main entry ----------------
 
-def check_counter_leg(remaining_df, sma_direction="NA"):
+def check_counter_leg(remaining_df, sma_direction="NA", tsma_direction="NA"):
     """
     remaining_df: rows still held after this cycle's target exits.
 
@@ -233,15 +233,14 @@ def check_counter_leg(remaining_df, sma_direction="NA"):
             ["symbol", "qty"]
         ].to_dict("records")
 
-        script_name = counter_leg_script(
-            signal,
-            records,
-            CBUY_SCRIPTS,
-        )
+        # Either the configured OUT signal or independent TSMA may favor the missing leg.
+        script_name = counter_leg_script(signal, records, CBUY_SCRIPTS)
+        if script_name is None:
+            script_name = counter_leg_script(tsma_direction, records, CBUY_SCRIPTS)
 
         if script_name is None:
             debug_log(
-                f"Counter check: exit signal {signal} "
+                f"Counter check: OUT={signal}, TSMA={tsma_direction} "
                 "does not oppose exactly one held option side."
             )
             return None
@@ -267,7 +266,8 @@ def check_counter_leg(remaining_df, sma_direction="NA"):
 
         # --------------------------------------------------
 
-        held = "PE" if signal == "BULL" else "CE"
+        # Resolve the held side from the selected counter-buy action, not OUT alone.
+        held = "CE" if script_name == CBUY_SCRIPTS.get("CE") else "PE"
         counter = "PE" if held == "CE" else "CE"
 
         now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
