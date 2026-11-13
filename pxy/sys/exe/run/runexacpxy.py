@@ -373,16 +373,15 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         cycle_tags,
         exit_signal,
     )
-    # Shared metrics calculate the SIDE target and minimum; only SIDE may initiate liquidation.
+    # Shared metrics calculate the cycle target; OUT direction does not gate RiskBar.
     book_count = metrics["cycle_trade_count"]
     risk_target = metrics["target"]
     # Pending liquidations resume earlier in _tick regardless of signal.
-    # New RiskBar liquidations may start only when OUT is SIDE.
+    # New RiskBar liquidations can start regardless of OUT signal.
     risk_enabled = (
         RISK_CANDLE_CONTROL_ENABLED
         and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
         and metrics["both_sides_open"]
-        and str(exit_signal).upper().strip() == "SIDE"
     )
     active_cycle_id = closed_cycle_count + 1
     print(format_cycle_status(active_cycle_id, risk_target))
@@ -396,8 +395,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             reasons.append("target square-off disabled")
         if not metrics["both_sides_open"]:
             reasons.append("both CE and PE must be open")
-        if str(exit_signal).upper().strip() != "SIDE":
-            reasons.append("OUT signal must be SIDE")
+        if not metrics["both_sides_negative"]:
+            reasons.append("both open sides must have negative P&L percentages")
         if metrics["premium_paid"] <= 0:
             reasons.append("cycle premium missing")
         if metrics["cycle_trade_count"] <= 0:
