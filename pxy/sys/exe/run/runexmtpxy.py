@@ -195,6 +195,24 @@ def cycle_risk_metrics(
         ce_investment = float((quantities[ce_mask] * prices[ce_mask]).sum())
         pe_investment = float((quantities[pe_mask] * prices[pe_mask]).sum())
 
+    # Require both currently open option sides to be losing for RiskBar exits.
+    ce_open_pnl = pe_open_pnl = 0.0
+    ce_open_cost = pe_open_cost = 0.0
+    if not active_cycle_rows.empty and {"SYMBOL", "QTY", "BUY_PRC", "PNL"}.issubset(active_cycle_rows.columns):
+        symbols = active_cycle_rows["SYMBOL"].astype(str).str.upper().str.strip()
+        qty = pd.to_numeric(active_cycle_rows["QTY"], errors="coerce").fillna(0).abs()
+        buy = pd.to_numeric(active_cycle_rows["BUY_PRC"], errors="coerce").fillna(0)
+        pnl = pd.to_numeric(active_cycle_rows["PNL"], errors="coerce").fillna(0)
+        ce_mask = symbols.str.endswith("CE") & (qty > 0)
+        pe_mask = symbols.str.endswith("PE") & (qty > 0)
+        ce_open_cost = float((qty[ce_mask] * buy[ce_mask]).sum())
+        pe_open_cost = float((qty[pe_mask] * buy[pe_mask]).sum())
+        ce_open_pnl = float(pnl[ce_mask].sum())
+        pe_open_pnl = float(pnl[pe_mask].sum())
+    ce_pnl_pct = 100.0 * ce_open_pnl / ce_open_cost if ce_open_cost > 0 else 0.0
+    pe_pnl_pct = 100.0 * pe_open_pnl / pe_open_cost if pe_open_cost > 0 else 0.0
+    both_sides_negative = ce_pnl_pct < 0 and pe_pnl_pct < 0
+
     heavy_side = None
     if ce_investment != pe_investment:
         heavy_side = "CE" if ce_investment > pe_investment else "PE"
@@ -218,6 +236,7 @@ def cycle_risk_metrics(
         and pe_qty > 0
         and cycle_trade_count > 0
         and premium_paid > 0
+        and both_sides_negative
         and cycle_pnl >= target
     )
 
@@ -237,6 +256,9 @@ def cycle_risk_metrics(
         "heavy_side": heavy_side,
         "heavy_side_aligned": heavy_side_aligned,
         "both_sides_open": ce_qty > 0 and pe_qty > 0,
+        "ce_pnl_pct": ce_pnl_pct,
+        "pe_pnl_pct": pe_pnl_pct,
+        "both_sides_negative": both_sides_negative,
         "target_reached": target_reached,
     }
 
