@@ -46,16 +46,16 @@ def _warn_once(key, msg):
 
 
 # === SURGICAL CHANGE START (Error Fallbacks Added) ===
-def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=0.0, pe_investment=0.0, ce_pnl_pct=0.0, pe_pnl_pct=0.0):
-    """LGT = -14 * OwnWorth / OppositeWorth; retain unused arguments for callers."""
+def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=0.0, pe_investment=0.0, ce_pnl_pct=0.0, pe_pnl_pct=0.0, ce_capital=None, pe_capital=None):
+    """LGT = -14 * OwnCapital / OppositeWorth."""
     try:
-        own_worth = float(ce_investment if is_ce else pe_investment)
+        own_capital = float((ce_capital if is_ce else pe_capital) if (ce_capital if is_ce else pe_capital) is not None else (ce_investment if is_ce else pe_investment))
         opposite_worth = float(pe_investment if is_ce else ce_investment)
-        if not all(math.isfinite(v) for v in (own_worth, opposite_worth)):
+        if not all(math.isfinite(v) for v in (own_capital, opposite_worth)):
             raise ValueError("non-finite LGT worth")
-        if own_worth <= 0 or opposite_worth <= 0:
+        if own_capital <= 0 or opposite_worth <= 0:
             return -14.0
-        raw_lgt = -14.0 * (own_worth / opposite_worth)
+        raw_lgt = -14.0 * (own_capital / opposite_worth)
         return max(-99.0, min(0.0, raw_lgt))
     except (TypeError, ValueError, OverflowError, ZeroDivisionError) as e:
         _warn_once("lgt_err", f"Error in calculate_lgt: {e}. Falling back to -14.0.")
