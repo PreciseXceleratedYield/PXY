@@ -47,25 +47,19 @@ def _warn_once(key, msg):
 
 # === SURGICAL CHANGE START (Error Fallbacks Added) ===
 def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=0.0, pe_investment=0.0, ce_pnl_pct=0.0, pe_pnl_pct=0.0):
-    """Signed LGT based on opposite worth, signed PNL percentage, and count."""
+    """LGT = -33 * OwnWorth / OppositeWorth; retain unused arguments for callers."""
     try:
-        opposite_count = float(pe_count if is_ce else ce_count)
         own_worth = float(ce_investment if is_ce else pe_investment)
         opposite_worth = float(pe_investment if is_ce else ce_investment)
-        opposite_pnl_pct = float(pe_pnl_pct if is_ce else ce_pnl_pct)
-
-        if not all(math.isfinite(v) for v in (opposite_count, own_worth, opposite_worth, opposite_pnl_pct)):
-            raise ValueError("non-finite LGT inputs")
+        if not all(math.isfinite(v) for v in (own_worth, opposite_worth)):
+            raise ValueError("non-finite LGT worth")
         if own_worth <= 0 or opposite_worth <= 0:
-            return -float(X)
-
-        raw_lgt = -(float(X) * (own_worth / opposite_worth)
-                    + opposite_pnl_pct * max(0.0, opposite_count))
-        return max(-99.0, min(99.0, raw_lgt))
-
+            return -33.0
+        raw_lgt = -33.0 * (own_worth / opposite_worth)
+        return max(-99.0, min(0.0, raw_lgt))
     except (TypeError, ValueError, OverflowError, ZeroDivisionError) as e:
-        _warn_once("lgt_err", f"Error in calculate_lgt: {e}. Falling back to -55.0.")
-        return -55.0
+        _warn_once("lgt_err", f"Error in calculate_lgt: {e}. Falling back to -33.0.")
+        return -33.0
 
 
 def calculate_tgt(
