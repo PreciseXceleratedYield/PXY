@@ -46,28 +46,22 @@ def _warn_once(key, msg):
 
 
 # === SURGICAL CHANGE START (Error Fallbacks Added) ===
-def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=0.0, pe_investment=0.0):
-    """Worth-ratio LGT: scale only negative thresholds by cumulative layer count."""
+def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=0.0, pe_investment=0.0, ce_pnl_pct=0.0, pe_pnl_pct=0.0):
+    """Negative LGT based on opposite worth, signed PNL percentage, and count."""
     try:
-        own_count = float(ce_count if is_ce else pe_count)
         opposite_count = float(pe_count if is_ce else ce_count)
         own_worth = float(ce_investment if is_ce else pe_investment)
         opposite_worth = float(pe_investment if is_ce else ce_investment)
+        opposite_pnl_pct = float(pe_pnl_pct if is_ce else ce_pnl_pct)
 
-        if not all(math.isfinite(v) for v in (own_count, opposite_count, own_worth, opposite_worth)):
+        if not all(math.isfinite(v) for v in (opposite_count, own_worth, opposite_worth, opposite_pnl_pct)):
             raise ValueError("non-finite LGT inputs")
-
-        cnt = max(1.0, own_count + opposite_count - 2.0)
         if own_worth <= 0 or opposite_worth <= 0:
-            base_lgt = -float(X)
-        elif own_worth == opposite_worth:
-            base_lgt = -float(X)
-        else:
-            direction = 1.0 if own_worth > opposite_worth else -1.0
-            base_lgt = -float(X) * (1.0 + (opposite_worth / own_worth) * direction)
+            return -float(X)
 
-        raw_lgt = base_lgt * cnt if base_lgt < 0 else base_lgt
-        return max(-99.0, min(99.0, raw_lgt))
+        raw_lgt = -(float(X) * (opposite_worth / own_worth)
+                    + opposite_pnl_pct * max(0.0, opposite_count))
+        return max(-99.0, min(-0.01, raw_lgt))
 
     except (TypeError, ValueError, OverflowError, ZeroDivisionError) as e:
         _warn_once("lgt_err", f"Error in calculate_lgt: {e}. Falling back to -55.0.")
