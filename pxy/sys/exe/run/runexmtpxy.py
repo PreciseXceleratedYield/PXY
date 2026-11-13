@@ -195,7 +195,7 @@ def cycle_risk_metrics(
         ce_investment = float((quantities[ce_mask] * prices[ce_mask]).sum())
         pe_investment = float((quantities[pe_mask] * prices[pe_mask]).sum())
 
-    # Require both currently open option sides to be losing for RiskBar exits.
+    # Require both currently open option sides to lose strictly more than 7% for RiskBar exits.
     ce_open_pnl = pe_open_pnl = 0.0
     ce_open_cost = pe_open_cost = 0.0
     if not active_cycle_rows.empty and {"SYMBOL", "QTY", "BUY_PRC", "PNL"}.issubset(active_cycle_rows.columns):
@@ -211,7 +211,7 @@ def cycle_risk_metrics(
         pe_open_pnl = float(pnl[pe_mask].sum())
     ce_pnl_pct = 100.0 * ce_open_pnl / ce_open_cost if ce_open_cost > 0 else 0.0
     pe_pnl_pct = 100.0 * pe_open_pnl / pe_open_cost if pe_open_cost > 0 else 0.0
-    both_sides_negative = ce_pnl_pct < 0 and pe_pnl_pct < 0
+    both_sides_negative = ce_pnl_pct < -7.0 and pe_pnl_pct < -7.0
 
     heavy_side = None
     if ce_investment != pe_investment:
