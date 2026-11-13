@@ -7,7 +7,7 @@
 #
 # Offset logic:
 #   ATM / ITM -> 0
-#   OTM       -> max(0, full distance - 50 per held lot), rounded to 100
+#   OTM       -> max(0, full distance - 50 per held lot), rounded to 50
 #
 # The calculated offset is passed directly to the force-buy Python function.
 # No weekday adjustment or additional offset is applied.
@@ -131,7 +131,7 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     price  -> price supplied in remaining_df
 
     ATM / ITM -> 0
-    OTM       -> full absolute distance at all times, rounded to 100
+    OTM       -> full absolute distance at all times, rounded to 50
     """
 
     if remaining_df is None or remaining_df.empty:
@@ -198,8 +198,8 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     # Use the full absolute strike-to-price gap at all times; no /2 adjustment.
     difference = abs(strike - spot)
 
-    # Preserve the existing strike-offset rounding to the nearest 100.
-    offset_step = 100
+    # Round the counter-buy offset to the nearest 50.
+    offset_step = 50
     return int(
         ((difference + offset_step / 2) // offset_step) * offset_step
     )
