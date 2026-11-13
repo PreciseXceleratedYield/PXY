@@ -59,7 +59,7 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
         if own_worth <= 0 or opposite_worth <= 0:
             return -float(X)
 
-        raw_lgt = -(float(X) * (opposite_worth / own_worth)
+        raw_lgt = -(float(X) * (own_worth / opposite_worth)
                     + opposite_pnl_pct * max(0.0, opposite_count))
         return max(-99.0, min(99.0, raw_lgt))
 
