@@ -124,6 +124,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file=DEFAULT_CHART_OU
             "st_line": st_val if st_val is not None and st_val > 0 else None,
             "mirror_line": mirror_val if mirror_val is not None and mirror_val > 0 else None,
             "sma50": finite_number(row.get("sma_50")),
+            "sma_variant": SMA50_VARIANT,
             "tsma50": finite_number(row.get("tsma_50")),
             "trend": str(row.get("ST_Trend", "SIDE")),
             "sma_trend": str(row.get("SMA_Trend", "NA")),
