@@ -178,8 +178,8 @@ SYSOUTPXY_ORIGINAL_SIGNAL_MODE = "SUPR"
 # Use SUPR for both channels independently of the DTHA candle transformation.
 SYSINPXY_SIGNAL_MODE = "SUPR"
 SYSOUTPXY_SIGNAL_MODE = "SUPR"
-if SYSINPXY_SIGNAL_MODE not in {"TSMAC0", "TSMAC1", "SUPR", "PIPE"}:
-    raise ValueError("SYSINPXY_SIGNAL_MODE must be TSMAC0, TSMAC1, SUPR or PIPE.")
+if SYSINPXY_SIGNAL_MODE not in {"TSMAC0", "TSMAC1", "SUPR", "PIPE", "SDIR"}:
+    raise ValueError("SYSINPXY_SIGNAL_MODE must be TSMAC0, TSMAC1, SUPR, PIPE or SDIR.")
 if SYSOUTPXY_SIGNAL_MODE not in {"TSMAC0", "TSMAC1", "SUPR", "PIPE"}:
     raise ValueError("SYSOUTPXY_SIGNAL_MODE must be TSMAC0, TSMAC1, SUPR or PIPE.")
 # Controls inclusion of the forming candle in DTHA analyses.
