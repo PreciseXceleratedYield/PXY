@@ -6,6 +6,7 @@ from sysdtafpxy import fetch_yf_data
 from sysdthapxy import transform_dtha_ohlc
 
 SWING_BARS = 2
+MAX_LOOKBACK = 14
 
 
 def get_structure_direction(df=None, swing_bars=SWING_BARS):
@@ -14,7 +15,7 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
     Uses confirmed swing pivots only: a pivot needs swing_bars candles
     on each side. The final row is treated as the running candle and
     cannot confirm a pivot. Breaks are confirmed only by completed candle closes; the running candle is ignored.
-    Direction persists after the latest confirmed break.
+    Swing levels expire after 14 candles; direction persists after the latest confirmed break.
     """
     result = {"break": "NO", "direction": "NONE"}
     try:
@@ -33,8 +34,8 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
         if n < 2 * swing_bars + 3:
             return result
 
-        last_high = None
-        last_low = None
+        last_high = None  # (price, pivot_index)
+        last_low = None   # (price, pivot_index)
         direction = "NONE"
         previous_close = None
         last_break = "NO"
@@ -43,18 +44,24 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
         for i in range(n - 1):
             # Pivot at j is confirmed by the completed candle i-1.
             j = i - swing_bars - 1
-            if j >= swing_bars:
+            # Only pivots fully contained in the latest 14-candle window qualify.
+            if j >= swing_bars and j - swing_bars >= max(0, i - MAX_LOOKBACK + 1):
                 left = j - swing_bars
                 right = j + swing_bars + 1
                 h = highs[j]
                 l = lows[j]
                 if pd.notna(h) and all(pd.notna(x) for x in highs[left:right]):
                     if all(h > highs[k] for k in range(left, right) if k != j):
-                        last_high = h
+                        last_high = (h, j)
                 if pd.notna(l) and all(pd.notna(x) for x in lows[left:right]):
                     if all(l < lows[k] for k in range(left, right) if k != j):
-                        last_low = l
+                        last_low = (l, j)
 
+            # Expire obsolete swing levels, but preserve the last confirmed direction.
+            if last_high is not None and last_high[1] < i - MAX_LOOKBACK + 1:
+                last_high = None
+            if last_low is not None and last_low[1] < i - MAX_LOOKBACK + 1:
+                last_low = None
             close = closes[i]
             if pd.isna(close):
                 previous_close = None
@@ -63,12 +70,12 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
             crossed_up = (
                 last_high is not None
                 and previous_close is not None
-                and previous_close <= last_high < close
+                and previous_close <= last_high[0] < close
             )
             crossed_down = (
                 last_low is not None
                 and previous_close is not None
-                and previous_close >= last_low > close
+                and previous_close >= last_low[0] > close
             )
             event = "NO"
             if crossed_up and not crossed_down:
