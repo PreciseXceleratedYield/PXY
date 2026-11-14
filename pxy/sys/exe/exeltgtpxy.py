@@ -88,8 +88,10 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Both-side targets use the same worth ratio regardless of OUT alignment.
+        # Both-side targets: aligned uses the worth ratio; unaligned uses X / 10.
         if both_sides_open:
+            if not is_aligned:
+                return X / 10.0
             try:
                 own = float(own_worth)
                 opposite = float(opposite_worth)
