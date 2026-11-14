@@ -93,19 +93,13 @@ def get_all_data():
         except (OSError, KeyError, ValueError, TypeError, OverflowError, AttributeError):
             pass
 
-    # Display SMA50 when trading filter is NONE; otherwise show the selected filter.
-    # This display fallback does not enable an entry filter.
-    filter_mode = "SMA" if SYSMKTPXY_ENTRY_FILTER == "NONE" else SYSMKTPXY_ENTRY_FILTER
-    filter_state = "NA"
-    filter_df = core.get("df")
-    if filter_df is not None and not filter_df.empty:
-        try:
-            if filter_mode == "SMA":
-                filter_state = get_sma_signal(filter_df).get("status", "NA")
-            elif filter_mode == "SDIR":
-                filter_state = get_structure_direction(filter_df).get("direction", "NA")
-        except Exception:
-            filter_state = "NA"
+    # Display the selected SMA50/ST50/SDIR direction independently of the
+    # optional market entry filter. The trading filter remains unchanged.
+    from syscnfgpxy import SMA50_VARIANT
+    filter_mode = SMA50_VARIANT
+    filter_state = str(core.get("sma", "NA")).upper().strip()
+    if filter_state not in {"BULL", "BEAR"}:
+        filter_state = "NONE" if filter_mode == "SDIR" else "NA"
 
     # -------- COMBINE --------
     data = {
