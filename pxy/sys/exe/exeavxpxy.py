@@ -171,10 +171,10 @@ def handle_side_averaging(client, df, index_price, positions_response=None, mark
     ce_opposite_signal = active_exit in {"BULL", "BEAR"} and not ce_aligned
     pe_opposite_signal = active_exit in {"BULL", "BEAR"} and not pe_aligned
 
-    # Reuse the cycle's SMA50 direction; unknown values keep the neutral multiplier.
-    sma_direction = "NA"
+    # Reuse the cycle's ST50 direction; unknown values keep the neutral multiplier.
+    st50_direction = "NA"
     if market_snapshot is not None and not market_snapshot.empty:
-        sma_direction = str(market_snapshot.iloc[-1].get("sma", "NA")).upper().strip()
+        st50_direction = str(market_snapshot.iloc[-1].get("st50", "NA")).upper().strip()
 
     # === SURGICAL LINE REPLACEMENT START ===
     ce_dynamic_threshold = calculate_lgt(
@@ -186,7 +186,7 @@ def handle_side_averaging(client, df, index_price, positions_response=None, mark
         pe_investment=pe_lgt_worth,
         ce_capital=ce_lgt_capital,
         pe_capital=pe_lgt_capital,
-        sma_direction=sma_direction,
+        st50_direction=st50_direction,
         ce_pnl_pct=ce_overall_pnl_pct,
         pe_pnl_pct=pe_overall_pnl_pct,
     )
@@ -200,7 +200,7 @@ def handle_side_averaging(client, df, index_price, positions_response=None, mark
         pe_investment=pe_lgt_worth,
         ce_capital=ce_lgt_capital,
         pe_capital=pe_lgt_capital,
-        sma_direction=sma_direction,
+        st50_direction=st50_direction,
         ce_pnl_pct=ce_overall_pnl_pct,
         pe_pnl_pct=pe_overall_pnl_pct,
     )
