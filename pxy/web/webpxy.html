@@ -1044,7 +1044,7 @@ async function loadChart(){
         ]);
         lastFutHistory=Array.isArray(futHistory)?futHistory:[];
         if(!Array.isArray(data)||!data.length)return;
-        const selectedVariant=data[data.length-1]?.sma_variant==="SMA50"?"SMA50":"ST50";
+        const selectedVariant=data[data.length-1]?.sma_variant==="ST50"?"ST50":"SMA50"; // SDIR is directional, not a plotted price line.
         const variantLabel=$("smaVariantLabel");
         if(variantLabel)variantLabel.textContent=selectedVariant;
         const variantToggle=document.querySelector('[data-chart-line="sma50"]');
