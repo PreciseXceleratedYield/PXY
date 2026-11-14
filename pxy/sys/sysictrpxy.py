@@ -8,10 +8,12 @@ from sysdthapxy import transform_dtha_ohlc, publish_dtha_json_payload
 from syssmapxy import calculate_moving_average, get_sma_signal
 from systsmpxy import calculate_tsma, get_tsma
 from sysstrnpxy import calculate_supertrend as calculate_st, get_market_trend
+from sysstftypxy import calculate_st50
 
 TIMEZONE = syscnfgpxy.SYSCNFGPXY_TIMEZONE
 TSMA_PERIOD = syscnfgpxy.SYSSMAPXY_TSMA_PERIOD
 SMA_PERIOD = syscnfgpxy.SYSSMAPXY_MA_PERIOD
+SMA50_VARIANT = syscnfgpxy.SMA50_VARIANT
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 DEFAULT_CHART_OUTPUT = os.path.join(
@@ -51,7 +53,11 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     tz_string = str(TIMEZONE)
     df = df.tz_convert(tz_string) if df.index.tz is not None else df.tz_localize("UTC").tz_convert(tz_string)
     df = calculate_st(df)
-    df["sma_50"] = calculate_moving_average(df["Close"], period=SMA_PERIOD, variant="SMA")
+    if SMA50_VARIANT == "ST50":
+        df = calculate_st50(df)
+        df["sma_50"] = df["st50"]
+    else:
+        df["sma_50"] = calculate_moving_average(df["Close"], period=SMA_PERIOD, variant="SMA")
     df["tsma_50"] = calculate_tsma(df["Close"], period=TSMA_PERIOD)
     close = pd.to_numeric(df["Close"], errors="coerce")
     sma = pd.to_numeric(df["sma_50"], errors="coerce")
@@ -71,7 +77,7 @@ def get_indicator_signals(df: pd.DataFrame) -> dict:
     if df is None or df.empty:
         return {"tsma": "NA", "sma": "NA", "st": "SIDE"}
     tsma_result = get_tsma(df, period=TSMA_PERIOD)
-    sma_result = get_sma_signal(df, period=SMA_PERIOD)
+    sma_result = {"status": str(df["SMA_Trend"].iloc[-1])}
     return {
         "tsma": tsma_result.get("status", "NA"),
         "sma": sma_result.get("status", "NA"),
