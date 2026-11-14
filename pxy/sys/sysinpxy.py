@@ -8,8 +8,7 @@ from syscnfgpxy import (
 )
 from sysdtafpxy import fetch_yf_data
 from sysdirpxy import detect_raw_direction
-from syssdirpxy import get_structure_direction
-from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states, get_supr_signals, get_stma_signals, get_pipe_binary_direction
+from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states, get_supr_signals, get_sdir_signals, get_stma_signals, get_pipe_binary_direction
 
 
 def get_signal(df=None):
@@ -23,14 +22,7 @@ def get_signal(df=None):
         # Live mode: include the forming candle in entry signals.
 
         if SYSINPXY_SIGNAL_MODE == "SDIR":
-            # Signal only a change in structure direction, not every BULL/BEAR candle.
-            if len(df) < 2:
-                return "NONE"
-            current = get_structure_direction(df).get("direction", "NONE")
-            previous = get_structure_direction(df.iloc[:-1].copy()).get("direction", "NONE")
-            if current == previous:
-                return "NONE"
-            return {"BULL": "BUY", "BEAR": "SELL"}.get(current, "NONE")
+            return get_sdir_signals(df)[0]
 
         if SYSINPXY_SIGNAL_MODE == "STMT":
             states = get_stmt_states(df)
