@@ -129,6 +129,7 @@ def get_all_data():
         "entry_filter_state": filter_state,
         "super_line": core.get("super_line"),
         "sma": core.get("sma", "NA"),
+        "st50": core.get("st50", "NA"),
         "tsma": core.get("tsma", "NA"),
 
         "ce_power": core.get("ce_power"),
