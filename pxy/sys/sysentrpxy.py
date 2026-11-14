@@ -6,6 +6,7 @@ from sysmktpxy import get_signals as get_market_signals
 from sysdirpxy import detect_raw_direction
 from sysmrngpxy import get_morning_direction
 from sysbbospxy import get_bos_bar
+from sysictrpxy import calculate_indicators, get_indicator_signals
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_FRESH_ENTRY_START,
@@ -29,6 +30,23 @@ def _apply_new_cycle_cutoff(entry_signal, exit_signal, now_time):
     if not (ENTRY_START <= now_time < ENTRY_END):
         entry_signal = {"BUY": "BNON", "SELL": "SNON"}.get(entry_signal, entry_signal)
     return entry_signal, exit_signal
+
+
+def _qualify_entry(entry_sig, df):
+    """Gate BUY/SELL against the selected SMA50/ST50 line; never modify OUT."""
+    if entry_sig not in {"BUY", "SELL"}:
+        return entry_sig
+    try:
+        if df is None or df.empty:
+            return "NONE"
+        indicator_df = calculate_indicators(df.copy())
+        direction = get_indicator_signals(indicator_df).get("sma", "NA")
+    except Exception as exc:
+        print(f"⚠️ SMA50/ST50 entry qualification unavailable: {exc}")
+        return "NONE"
+    if (entry_sig == "BUY" and direction == "BULL") or (entry_sig == "SELL" and direction == "BEAR"):
+        return entry_sig
+    return "NONE"
 
 
 def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
@@ -62,6 +80,10 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         except Exception as exc:
             print(f"⚠️ Morning direction override unavailable: {exc}")
             entry_sig, exit_sig = "NONE", "NONE"
+        if df is None:
+            from sysdtafpxy import fetch_yf_data
+            df = fetch_yf_data()
+        entry_sig = _qualify_entry(entry_sig, df)
         print(f"⏱️ MORNING OVERRIDE | IN: {entry_sig} | OUT: {exit_sig}")
         return _apply_new_cycle_cutoff(entry_sig, exit_sig, now_time)
 
@@ -104,6 +126,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     entry_sig = raw_entry if raw_entry in {"BUY", "SELL"} else "NONE"
     exit_sig = raw_exit if raw_exit in {"BULL", "BEAR", "SIDE"} else "NONE"
 
+    entry_sig = _qualify_entry(entry_sig, df)
     print(f"⏱️ IN: {entry_sig} | OUT: {exit_sig}")
     return _apply_new_cycle_cutoff(entry_sig, exit_sig, now_time)
 
