@@ -309,6 +309,38 @@ def get_supr_signals(df, include_running=None):
     return ("BUY" if st_direction == "BULL" else "SELL", out_signal)
 
 
+def get_sdir_signals(df, include_running=None):
+    """SUPR signal rules with SDIR structure direction replacing SuperTrend."""
+    from syssdirpxy import get_structure_direction
+
+    neutral = ("NONE", "SIDE")
+    if df is None or df.empty or not {"Open", "High", "Low", "Close"}.issubset(df.columns):
+        return neutral
+    if include_running is None:
+        include_running = SYSDTHAPXY_INCLUDE_RUNNING_CANDLE == "YES"
+    candles = df if include_running else df.iloc[:-1]
+    if len(candles) < 2:
+        return neutral
+    transformed = transform_dtha_ohlc(candles)
+    closes = pd.to_numeric(transformed["Close"], errors="coerce")
+    if len(closes) < 2 or not np.isfinite(closes.iloc[-2:]).all():
+        return neutral
+    change = closes.iloc[-1] - closes.iloc[-2]
+    if change == 0:
+        return neutral
+    raw_direction = "BULL" if change > 0 else "BEAR"
+    sdir = get_structure_direction(candles).get("direction", "NONE")
+    if sdir not in {"BULL", "BEAR"}:
+        return neutral
+    previous_sdir = get_structure_direction(candles.iloc[:-1].copy()).get("direction", "NONE")
+    out_signal = raw_direction if sdir == raw_direction else "SIDE"
+    if previous_sdir in {"BULL", "BEAR"} and previous_sdir != sdir:
+        return ("BUY" if sdir == "BULL" else "SELL", out_signal)
+    if sdir == raw_direction:
+        return ("NONE", out_signal)
+    return ("BUY" if sdir == "BULL" else "SELL", out_signal)
+
+
 def get_stma_signals(df, include_running=None):
     """Hybrid ST + TSMA crossing: IN on a crossing, OUT by price side."""
     from sysstrnpxy import _compute_single_st
