@@ -92,7 +92,12 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Both-side targets: aligned uses the worth ratio; unaligned uses X / 10.
+        # After the late-day cutoff, every open position has the 99% target.
+        if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
+            return EXETGTPXY_PRD_MAX_TARGET_PCT
+
+        # Both-side targets: aligned uses the worth ratio, capped at 99%;
+        # unaligned retains X / 10 (1.4%).
         if both_sides_open:
             if not is_aligned:
                 return X / 10.0
@@ -101,14 +106,9 @@ def calculate_tgt(
                 opposite = float(opposite_worth)
                 if not (math.isfinite(own) and math.isfinite(opposite)) or own <= 0 or opposite <= 0:
                     return X
-                return X * (opposite / own)
+                return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X * (opposite / own))
             except (TypeError, ValueError, OverflowError, ZeroDivisionError):
                 return 0.0
-
-        # From the configured late-day cutoff (15:14 IST), set 99% target for every position,
-        # regardless of alignment or whether one or both sides are open.
-        if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
-            return EXETGTPXY_PRD_MAX_TARGET_PCT
 
         def positive_factor(value):
             try:
