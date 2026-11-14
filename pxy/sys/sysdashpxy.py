@@ -15,6 +15,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_TRADING_DAY_END,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
+    SMA50_VARIANT,
 )
 from sysdthapxy import get_pxy_data, get_signal_depth_analysis, transform_dtha_ohlc
 from syskatrpxy import calculate_atr, calculate_dynamic_k
@@ -219,8 +220,9 @@ def print_dashboard(data):
     tsma_status = data.get("tsma", "NA")
     sma_color = Fore.LIGHTGREEN_EX if sma_status == "BULL" else Fore.LIGHTRED_EX if sma_status == "BEAR" else Fore.YELLOW
     tsma_color = Fore.LIGHTGREEN_EX if tsma_status == "BULL" else Fore.LIGHTRED_EX if tsma_status == "BEAR" else Fore.YELLOW
-    s_ind = TOTAL_WIDTH - len(f"SMA:{sma_status}") - len(f"TSMA:{tsma_status}")
-    print(Fore.WHITE + "SMA:" + sma_color + sma_status + " " * max(1, s_ind) + Fore.WHITE + "TSMA:" + tsma_color + tsma_status)
+    trend_label = SMA50_VARIANT if SMA50_VARIANT in {"SMA50", "ST50", "SDIR"} else "SMA50"
+    s_ind = TOTAL_WIDTH - len(f"{trend_label}:{sma_status}") - len(f"TSMA:{tsma_status}")
+    print(Fore.WHITE + trend_label + ":" + sma_color + sma_status + " " * max(1, s_ind) + Fore.WHITE + "TSMA:" + tsma_color + tsma_status)
 
     # 9. LIVE ORDER SIGNALS (FINAL STATUS ROW)
     ent, ext = data["entry"], data["exit"]
