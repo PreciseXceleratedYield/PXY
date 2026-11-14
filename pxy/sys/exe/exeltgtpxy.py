@@ -125,7 +125,7 @@ def calculate_tgt(
         # from 09:15 until 15:14. The late-day override remains authoritative.
         if not both_sides_open and dt_time(9, 15) <= current_time < EXETGTPXY_PRD_LATE_DAY_TIME:
             target_pct = (
-                X / max(own_power, own_depth)
+                max(X / (own_power + own_depth), X / 10.0)
                 if is_aligned
                 else X / 10.0
             )
