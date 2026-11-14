@@ -47,7 +47,7 @@ def _warn_once(key, msg):
 
 # === SURGICAL CHANGE START (Error Fallbacks Added) ===
 def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=0.0, pe_investment=0.0, ce_pnl_pct=0.0, pe_pnl_pct=0.0, ce_capital=None, pe_capital=None):
-    """LGT = ((OppositeWorth - OwnWorth) / 1000) * (OwnWorth / OppositeWorth)."""
+    """LGT = -2 * X * (OwnWorth / OppositeWorth)."""
     try:
         own_worth = float(ce_investment if is_ce else pe_investment)
         opposite_worth = float(pe_investment if is_ce else ce_investment)
@@ -55,7 +55,7 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
             raise ValueError("non-finite LGT worth")
         if opposite_worth <= 0:
             return -14.0
-        raw_lgt = ((opposite_worth - own_worth) / 1000.0) * (own_worth / opposite_worth)
+        raw_lgt = -2.0 * X * (own_worth / opposite_worth)
         return max(-99.0, min(99.0, raw_lgt))
     except (TypeError, ValueError, OverflowError, ZeroDivisionError) as e:
         _warn_once("lgt_err", f"Error in calculate_lgt: {e}. Falling back to -14.0.")
