@@ -14,7 +14,8 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
 
     Uses confirmed swing pivots only: a pivot needs swing_bars candles
     on each side. The final row is treated as the running candle and
-    cannot confirm a pivot. Breaks are confirmed only by completed candle closes; the running candle is ignored.
+    cannot confirm a pivot. Breakouts may use the running candle close,
+    while swing pivots and microtrends require completed-candle confirmation.
     Swing levels expire after 14 candles. New confirmed three-pivot microtrends
     may change direction when no breakout occurs; otherwise retain direction.
     """
@@ -42,8 +43,9 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
         last_break = "NO"
         pivots = []  # Confirmed, chronological (kind, price, index) swings
 
-        # Exclude the final, still-forming candle from breakout confirmation.
-        for i in range(n - 1):
+        # Include the running candle for breakout detection; pivot confirmation
+        # still uses only candles ending at i-1 (never the running candle).
+        for i in range(n):
             # Pivot at j is confirmed by the completed candle i-1.
             j = i - swing_bars - 1
             # Only pivots fully contained in the latest 14-candle window qualify.
@@ -112,7 +114,7 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
                 # confirmed three-point pattern, not on every subsequent bar.
                 direction = microtrend
 
-            if i == n - 2:
+            if i == n - 1:
                 last_break = event
             previous_close = close
 
