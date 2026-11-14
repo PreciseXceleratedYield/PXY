@@ -213,7 +213,7 @@ SYSDTAFPXY_DEFAULT_INTERVAL = "1m"
 # Requested number of market-data candles.
 SYSDTAFPXY_DEFAULT_TARGET_ROWS = 60
 # Limit or threshold governing futures max age seconds.
-SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS = 60
+SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS = 300
 if (
     isinstance(SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS, bool)
     or not isinstance(SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS, (int, float))
