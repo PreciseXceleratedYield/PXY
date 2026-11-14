@@ -60,8 +60,8 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
         raw_lgt = -2.0 * X * ratio
         return max(-99.0, min(99.0, raw_lgt))
     except (TypeError, ValueError, OverflowError, ZeroDivisionError) as e:
-        _warn_once("lgt_err", f"Error in calculate_lgt: {e}. Falling back to -14.0.")
-        return -14.0
+        _warn_once("lgt_err", f"Error in calculate_lgt: {e}. Falling back to -2X.")
+        return -2.0 * X
 
 
 def calculate_tgt(
