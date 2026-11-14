@@ -233,14 +233,12 @@ def check_counter_leg(remaining_df, sma_direction="NA", tsma_direction="NA"):
             ["symbol", "qty"]
         ].to_dict("records")
 
-        # Either the configured OUT signal or independent TSMA may favor the missing leg.
+        # Counter-buy eligibility follows the configured OUT signal only.
         script_name = counter_leg_script(signal, records, CBUY_SCRIPTS)
-        if script_name is None:
-            script_name = counter_leg_script(tsma_direction, records, CBUY_SCRIPTS)
 
         if script_name is None:
             debug_log(
-                f"Counter check: OUT={signal}, TSMA={tsma_direction} "
+                f"Counter check: OUT={signal} "
                 "does not oppose exactly one held option side."
             )
             return None
