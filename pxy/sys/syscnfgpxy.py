@@ -272,6 +272,11 @@ SYSSMAPXY_VARIANT = "TSMA"
 if SYSSMAPXY_VARIANT not in {"SMA", "TSMA"}:
     raise ValueError("SYSSMAPXY_VARIANT must be SMA or TSMA.")
 
+# Select the line behind the existing SMA50 signal (LGT and indicator consumers).
+SMA50_VARIANT = "ST50"  # "SMA50" or "ST50"
+if SMA50_VARIANT not in {"SMA50", "ST50"}:
+    raise ValueError("SMA50_VARIANT must be SMA50 or ST50.")
+
 # Default window for the 50-period SMA/TSMA display and status calculation.
 # Window for the general moving-average display.
 SYSSMAPXY_MA_PERIOD = 50
