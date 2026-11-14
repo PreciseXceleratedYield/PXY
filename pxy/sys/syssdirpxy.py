@@ -5,7 +5,7 @@ import pandas as pd
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import transform_dtha_ohlc
 
-SWING_BARS = 2
+SWING_BARS = 1
 MAX_LOOKBACK = 14
 
 
