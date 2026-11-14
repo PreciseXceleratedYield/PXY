@@ -96,7 +96,7 @@ def calculate_tgt(
                 own = float(own_worth)
                 opposite = float(opposite_worth)
                 if not (math.isfinite(own) and math.isfinite(opposite)) or own <= 0 or opposite <= 0:
-                    return 0.0
+                    return EXETGTPXY_PRD_MAX_TARGET_PCT
                 return X * (opposite / own)
             except (TypeError, ValueError, OverflowError, ZeroDivisionError):
                 return 0.0
