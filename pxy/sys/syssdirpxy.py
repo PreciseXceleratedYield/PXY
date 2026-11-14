@@ -13,7 +13,7 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
 
     Uses confirmed swing pivots only: a pivot needs swing_bars candles
     on each side. The final row is treated as the running candle and
-    cannot confirm a pivot. Breaks are tested against its live Close.
+    cannot confirm a pivot. Breaks are confirmed only by completed candle closes; the running candle is ignored.
     Direction persists after the latest confirmed break.
     """
     result = {"break": "NO", "direction": "NONE"}
@@ -39,7 +39,8 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
         previous_close = None
         last_break = "NO"
 
-        for i in range(n):
+        # Exclude the final, still-forming candle from breakout confirmation.
+        for i in range(n - 1):
             # Pivot at j is confirmed by the completed candle i-1.
             j = i - swing_bars - 1
             if j >= swing_bars:
@@ -77,7 +78,7 @@ def get_structure_direction(df=None, swing_bars=SWING_BARS):
                 direction = "BEAR"
                 event = "YES"
 
-            if i == n - 1:
+            if i == n - 2:
                 last_break = event
             previous_close = close
 
