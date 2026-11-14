@@ -43,8 +43,8 @@ def is_monthly_expiry(expiry_date):
 
 
 def round_to_strike(price):
-    # Select the nearest 100-point strike (ending in 00) for all buys.
-    return int(round(float(price) / 100) * 100)
+    # Use the configured strike increment for all buys, including counter-buys.
+    return int(round(float(price) / STRIKE_STEP) * STRIKE_STEP)
 
 
 # ---------------- MAIN ----------------
