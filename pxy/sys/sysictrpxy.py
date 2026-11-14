@@ -9,6 +9,7 @@ from syssmapxy import calculate_moving_average, get_sma_signal
 from systsmpxy import calculate_tsma, get_tsma
 from sysstrnpxy import calculate_supertrend as calculate_st, get_market_trend
 from sysstftypxy import calculate_st50
+from syssdirpxy import get_structure_direction
 
 TIMEZONE = syscnfgpxy.SYSCNFGPXY_TIMEZONE
 TSMA_PERIOD = syscnfgpxy.SYSSMAPXY_TSMA_PERIOD
@@ -36,6 +37,8 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
             return df.copy()
     if df.empty:
         return df
+    # Compute SDIR on raw candles; SDIR applies DTHA exactly once itself.
+    sdir_direction = get_structure_direction(df).get('direction', 'NONE') if SMA50_VARIANT == 'SDIR' else None
     # DTHA is the only candle transformation authority.
     df = transform_dtha_ohlc(df)
     required_ohlc = ("Open", "High", "Low", "Close")
@@ -63,6 +66,8 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     sma = pd.to_numeric(df["sma_50"], errors="coerce")
     tsma = pd.to_numeric(df["tsma_50"], errors="coerce")
     df["SMA_Trend"] = np.select([sma.isna(), close >= sma], ["NA", "BULL"], default="BEAR")
+    if SMA50_VARIANT == "SDIR":
+        df["SMA_Trend"] = sdir_direction if sdir_direction in {"BULL", "BEAR"} else "NA"
     df["TSMA_Trend"] = np.select([tsma.isna(), close >= tsma], ["NA", "BULL"], default="BEAR")
     return df
 
