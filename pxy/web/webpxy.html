@@ -474,8 +474,8 @@ body{
                 <span onclick="setChartMode('line')" id="chartModeLine" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">📉</span>
                 <span id="chartLineOptions" aria-label="Chart line visibility" style="display:flex;align-items:center;gap:7px;font-size:8px;white-space:nowrap;">
                     <label style="display:flex;align-items:center;gap:3px;color:var(--cjs-sma);cursor:pointer;">
-                        <input class="chart-line-toggle" type="checkbox" data-chart-line="sma50" checked aria-label="Show SMA 50" style="width:12px;height:12px;margin:0;accent-color:var(--cjs-sma);">
-                        SMA
+                        <input class="chart-line-toggle" type="checkbox" data-chart-line="sma50" checked aria-label="Show ST50" style="width:12px;height:12px;margin:0;accent-color:var(--cjs-sma);">
+                        <span id="smaVariantLabel">ST50</span>
                     </label>
                     <label style="display:flex;align-items:center;gap:3px;color:var(--accent);cursor:pointer;">
                         <input class="chart-line-toggle" type="checkbox" data-chart-line="tsma50" checked aria-label="Show TSMA 50" style="width:12px;height:12px;margin:0;accent-color:var(--accent);">
@@ -1044,6 +1044,11 @@ async function loadChart(){
         ]);
         lastFutHistory=Array.isArray(futHistory)?futHistory:[];
         if(!Array.isArray(data)||!data.length)return;
+        const selectedVariant=data[data.length-1]?.sma_variant==="SMA50"?"SMA50":"ST50";
+        const variantLabel=$("smaVariantLabel");
+        if(variantLabel)variantLabel.textContent=selectedVariant;
+        const variantToggle=document.querySelector('[data-chart-line="sma50"]');
+        if(variantToggle)variantToggle.setAttribute("aria-label","Show "+selectedVariant);
         const candles=data.map(d=>({
             o:d.open??d.o??null, h:d.high??d.h??null, l:d.low??d.l??null,
             c:d.close??d.Close??d.price??null,
