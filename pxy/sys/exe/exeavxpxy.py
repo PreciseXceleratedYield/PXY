@@ -114,7 +114,7 @@ def print_telemetry_dashboard(p):
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
 
-def handle_side_averaging(client, df, index_price, positions_response=None):
+def handle_side_averaging(client, df, index_price, positions_response=None, market_snapshot=None):
     """Runs System A (averaging) each cycle. Exits and counter-buys live in the exit pipe."""
     if df is None or df.empty:
         return
@@ -171,6 +171,11 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
     ce_opposite_signal = active_exit in {"BULL", "BEAR"} and not ce_aligned
     pe_opposite_signal = active_exit in {"BULL", "BEAR"} and not pe_aligned
 
+    # Reuse the cycle's SMA50 direction; unknown values keep the neutral multiplier.
+    sma_direction = "NA"
+    if market_snapshot is not None and not market_snapshot.empty:
+        sma_direction = str(market_snapshot.iloc[-1].get("sma", "NA")).upper().strip()
+
     # === SURGICAL LINE REPLACEMENT START ===
     ce_dynamic_threshold = calculate_lgt(
         is_aligned=ce_aligned,
@@ -181,6 +186,7 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
         pe_investment=pe_lgt_worth,
         ce_capital=ce_lgt_capital,
         pe_capital=pe_lgt_capital,
+        sma_direction=sma_direction,
         ce_pnl_pct=ce_overall_pnl_pct,
         pe_pnl_pct=pe_overall_pnl_pct,
     )
@@ -194,6 +200,7 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
         pe_investment=pe_lgt_worth,
         ce_capital=ce_lgt_capital,
         pe_capital=pe_lgt_capital,
+        sma_direction=sma_direction,
         ce_pnl_pct=ce_overall_pnl_pct,
         pe_pnl_pct=pe_overall_pnl_pct,
     )
