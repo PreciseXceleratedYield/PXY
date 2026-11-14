@@ -58,7 +58,7 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
         else:
             ratio = own_worth / opposite_worth
         sma = str(sma_direction).upper().strip()
-        trend_factor = 2.0 if ((is_ce and sma == "BEAR") or (not is_ce and sma == "BULL")) else 1.0
+        trend_factor = 3.0 if ((is_ce and sma == "BEAR") or (not is_ce and sma == "BULL")) else 1.0
         raw_lgt = -2.0 * X * ratio * trend_factor
         return max(-99.0, min(99.0, raw_lgt))
     except (TypeError, ValueError, OverflowError, ZeroDivisionError) as e:
