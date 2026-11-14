@@ -20,6 +20,7 @@ from sysdthapxy import get_pxy_data, get_signal_depth_analysis, transform_dtha_o
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysdirpxy import detect_raw_direction
 from sysictrpxy import calculate_indicators, get_indicator_signals
+from sysstftypxy import calculate_st50
 from syspwerpxy import get_ce_pe_power
 from sysentrpxy import get_entry_signal
 from sysoutpxy import get_out_candles
@@ -132,6 +133,8 @@ def get_full_snapshot(monitor=False):
     result["super_line"] = line_val
     indicator_signals = get_indicator_signals(processed_st_df)
     result["sma"] = indicator_signals["sma"]
+    st50_df = calculate_st50(processed_st_df)
+    result["st50"] = str(st50_df["ST50_Trend"].iloc[-1]) if not st50_df.empty else "NA"
     result["tsma"] = indicator_signals["tsma"]
     result["df"] = processed_st_df
     # Web chart and indicator series use the shared DTHA candles.
