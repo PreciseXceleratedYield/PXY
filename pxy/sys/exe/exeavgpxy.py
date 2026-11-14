@@ -74,7 +74,8 @@ def run_snapshot():
         print(f"{Fore.YELLOW}⚠️ Broker snapshot unavailable; averaging skipped.")
         return
     handle_side_averaging(
-        client, df, index_price, positions_response=positions_response
+        client, df, index_price, positions_response=positions_response,
+        market_snapshot=market_snapshot
     )
 
 if __name__ == "__main__":
