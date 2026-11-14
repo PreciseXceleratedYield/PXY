@@ -62,19 +62,6 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         except Exception as exc:
             print(f"⚠️ Morning direction override unavailable: {exc}")
             entry_sig, exit_sig = "NONE", "NONE"
-        # BOS has entry priority from market activation, including the morning window.
-        # Morning OC2 remains the sole OUT authority until 09:30.
-        try:
-            from sysdtafpxy import fetch_yf_data
-            bos_df = df if df is not None else fetch_yf_data()
-            _, bos_signal = get_bos_bar(bos_df)
-            bos_signal = str(bos_signal).upper().strip()
-            if bos_signal in {"NBUY", "MBUY"}:
-                entry_sig = "BUY"
-            elif bos_signal in {"NSELL", "MSELL"}:
-                entry_sig = "SELL"
-        except Exception as exc:
-            print(f"⚠️ Morning BOS entry priority unavailable: {exc}")
         print(f"⏱️ MORNING OVERRIDE | IN: {entry_sig} | OUT: {exit_sig}")
         return _apply_new_cycle_cutoff(entry_sig, exit_sig, now_time)
 
