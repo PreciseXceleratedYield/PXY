@@ -92,23 +92,21 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # After the late-day cutoff, every open position has the 99% target.
+        # With both option sides open, only agreement between SDIR and OUT
+        # awards 99% to the matching side; every other target is X/10 (1.4%).
+        # This rule takes precedence over the late-day single-side override.
+        if both_sides_open:
+            direction = str(tsma_state or "").upper().strip()
+            out = str(exit_signal or "").upper().strip()
+            confirmed = direction == out and (
+                (is_ce is True and out == "BULL")
+                or (is_ce is False and out == "BEAR")
+            )
+            return EXETGTPXY_PRD_MAX_TARGET_PCT if confirmed else X / 10.0
+
+        # Preserve the existing late-day override for single-side positions.
         if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
             return EXETGTPXY_PRD_MAX_TARGET_PCT
-
-        # Both-side targets: aligned uses the worth ratio, capped at 99%;
-        # unaligned retains X / 10 (1.4%).
-        if both_sides_open:
-            if not is_aligned:
-                return X / 10.0
-            try:
-                own = float(own_worth)
-                opposite = float(opposite_worth)
-                if not (math.isfinite(own) and math.isfinite(opposite)) or own <= 0 or opposite <= 0:
-                    return X
-                return min(EXETGTPXY_PRD_MAX_TARGET_PCT, X * (opposite / own))
-            except (TypeError, ValueError, OverflowError, ZeroDivisionError):
-                return 0.0
 
         def positive_factor(value):
             try:
@@ -253,7 +251,7 @@ def target_price(
             own_count=ce_count if is_ce else pe_count,
             own_worth=ce_investment if is_ce else pe_investment,
             opposite_worth=pe_investment if is_ce else ce_investment,
-            tsma_state=row.get("tsma"),
+            tsma_state=row.get("sdir"),
             is_ce=is_ce,
         )
 
