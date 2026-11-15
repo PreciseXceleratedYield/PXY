@@ -6,6 +6,8 @@
 
 **ATS / work history:** SAP Asia Pte Ltd is ONE employer, ONE consolidated role, ONE employment date range. Mention internal roles within descriptive paragraphs only; no internal dates or separate employer entries. Microsoft India and Microsoft Singapore contract remain separate records. Preserve truthful distinctions between hands-on delivery, program governance, advisory exposure, and ecosystem familiarity; keyword coverage is not a claim of hands-on proficiency with every named product.
 
+**Professional identity:** Position the candidate consistently as an SAP technology consultant, SAP Basis/HANA/cloud platform architect and technical transformation leader. He is NOT an ABAP developer and NOT an SAP functional consultant. ABAP, RAP, CAP, UI5, CDS, functional modules and application-side technologies may appear only as architecture dependencies, platform integration, migration governance or collaboration with specialist teams; never imply hands-on coding or functional configuration. Prioritize SAP technical operations, infrastructure, database, cloud, integration, security, migrations, AIOps and technical leadership.
+
 **Keyword integrity:** Retain ATS-relevant technology and leadership terms in natural work-experience context. Avoid long transaction-code inventories, duplicate skill lists, and unsupported claims of hands-on experience with emerging AI products; include current AI/automation projects only where independently evidenced.
 
 **Change control:** Tailor Page 1 only for job-specific applications unless the user explicitly requests changes to other sections. Do not silently modify the approved master experience or skills; verify exported PDF page count and readable text.
