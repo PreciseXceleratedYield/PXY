@@ -32,12 +32,22 @@ def get_signal(df=None):
                 return "NONE"
             previous = "GREEN" if mid.iloc[-2] > mid.iloc[-3] else "RED" if mid.iloc[-2] < mid.iloc[-3] else "NONE"
             current = "GREEN" if mid.iloc[-1] > mid.iloc[-2] else "RED" if mid.iloc[-1] < mid.iloc[-2] else "NONE"
-            return {
+            state = {
                 ("GREEN", "RED"): "SELL",
                 ("RED", "RED"): "BEAR",
                 ("RED", "GREEN"): "BUY",
                 ("GREEN", "GREEN"): "BULL",
             }.get((previous, current), "NONE")
+            # OC2 flips always win. Only continuation states need SDIR alignment.
+            if state in {"BUY", "SELL", "NONE"}:
+                return state
+            from syssdirpxy import get_structure_direction
+            sdir = str(get_structure_direction(df).get("direction", "NONE")).upper()
+            if state == "BULL" and sdir == "BULL":
+                return "BUY"
+            if state == "BEAR" and sdir == "BEAR":
+                return "SELL"
+            return "NONE"
 
         if SYSINPXY_SIGNAL_MODE == "SDIR":
             return get_sdir_signals(df)[0]
