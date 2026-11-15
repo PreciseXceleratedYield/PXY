@@ -45,7 +45,10 @@ def get_signal(df=None):
             return get_pipe_binary_direction(df) or "NONE"
 
         if SYSOUTPXY_SIGNAL_MODE == "SDIR":
-            return get_sdir_signals(df)[1]
+            # OUT follows SDIR structure directly, without OC2 agreement or SIDE.
+            from syssdirpxy import get_structure_direction
+            direction = str(get_structure_direction(df).get("direction", "NONE")).upper()
+            return direction if direction in {"BULL", "BEAR"} else "NONE"
 
         if SYSOUTPXY_SIGNAL_MODE == "SUPR":
             return get_supr_signals(df)[1]
