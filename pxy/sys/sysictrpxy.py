@@ -38,7 +38,7 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
     # Compute SDIR on raw candles; SDIR applies DTHA exactly once itself.
-    sdir_direction = get_structure_direction(df).get('direction', 'NONE') if SMA50_VARIANT == 'SDIR' else None
+    sdir_direction = get_structure_direction(df).get('direction', 'NONE')
     # DTHA is the only candle transformation authority.
     df = transform_dtha_ohlc(df)
     required_ohlc = ("Open", "High", "Low", "Close")
@@ -66,8 +66,7 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     sma = pd.to_numeric(df["sma_50"], errors="coerce")
     tsma = pd.to_numeric(df["tsma_50"], errors="coerce")
     df["SMA_Trend"] = np.select([sma.isna(), close >= sma], ["NA", "BULL"], default="BEAR")
-    if SMA50_VARIANT == "SDIR":
-        df["SMA_Trend"] = sdir_direction if sdir_direction in {"BULL", "BEAR"} else "NA"
+    df["SDIR_Trend"] = sdir_direction if sdir_direction in {"BULL", "BEAR"} else "NA"
     df["TSMA_Trend"] = np.select([tsma.isna(), close >= tsma], ["NA", "BULL"], default="BEAR")
     return df
 
@@ -75,7 +74,7 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
 def get_indicator_signals(df: pd.DataFrame) -> dict:
     """Return the latest independent TSMA, SMA, and ST classifications."""
     if df is None or df.empty:
-        return {"tsma": "NA", "sma": "NA", "st": "SIDE"}
+        return {"tsma": "NA", "sma": "NA", "sdir": "NA", "st": "SIDE"}
     required = {"TSMA_Trend", "SMA_Trend", "ST_Trend"}
     if not required.issubset(df.columns):
         df = calculate_indicators(df)
@@ -86,6 +85,7 @@ def get_indicator_signals(df: pd.DataFrame) -> dict:
     return {
         "tsma": tsma_result.get("status", "NA"),
         "sma": sma_result.get("status", "NA"),
+        "sdir": str(df["SDIR_Trend"].iloc[-1]) if "SDIR_Trend" in df.columns else "NA",
         "st": get_market_trend(df),
     }
 
@@ -133,6 +133,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file=DEFAULT_CHART_OU
             "tsma50": finite_number(row.get("tsma_50")),
             "trend": str(row.get("ST_Trend", "SIDE")),
             "sma_trend": str(row.get("SMA_Trend", "NA")),
+            "sdir_trend": str(row.get("SDIR_Trend", "NA")),
             "tsma_trend": str(row.get("TSMA_Trend", "NA")),
         })
     if not output:
