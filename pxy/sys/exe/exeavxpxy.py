@@ -171,10 +171,10 @@ def handle_side_averaging(client, df, index_price, positions_response=None, mark
     ce_opposite_signal = active_exit in {"BULL", "BEAR"} and not ce_aligned
     pe_opposite_signal = active_exit in {"BULL", "BEAR"} and not pe_aligned
 
-    # Reuse the cycle's SMA50-selected direction; unknown values keep the neutral multiplier.
+    # LGT explicitly uses SDIR; SMA is a separate market snapshot signal.
     sma_direction = "NA"
     if market_snapshot is not None and not market_snapshot.empty:
-        sma_direction = str(market_snapshot.iloc[-1].get("sma", "NA")).upper().strip()
+        sma_direction = str(market_snapshot.iloc[-1].get("sdir", "NA")).upper().strip()
 
     # === SURGICAL LINE REPLACEMENT START ===
     ce_dynamic_threshold = calculate_lgt(
