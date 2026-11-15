@@ -21,6 +21,16 @@ def get_signal(df=None):
 
         # Live mode: include the forming candle in entry signals.
 
+        if SYSINPXY_SIGNAL_MODE == "OC2":
+            # Pure OC2: compare running midpoint against previous midpoint, no TSMA.
+            if len(df) < 2 or "Open" not in df.columns:
+                return "NONE"
+            mid = (pd.to_numeric(df["Open"], errors="coerce") + pd.to_numeric(df["Close"], errors="coerce")) / 2.0
+            previous, current = mid.iloc[-2], mid.iloc[-1]
+            if pd.isna(previous) or pd.isna(current):
+                return "NONE"
+            return "BUY" if current > previous else "SELL" if current < previous else "NONE"
+
         if SYSINPXY_SIGNAL_MODE == "SDIR":
             return get_sdir_signals(df)[0]
 
