@@ -29,7 +29,25 @@ def get_signal(df=None):
             previous, current = mid.iloc[-2], mid.iloc[-1]
             if pd.isna(previous) or pd.isna(current):
                 return "NONE"
-            return "BUY" if current > previous else "SELL" if current < previous else "NONE"
+            signal = "BUY" if current > previous else "SELL" if current < previous else "NONE"
+            if signal == "NONE":
+                return "NONE"
+
+            # SDIR qualifies OC2 signals. A fresh OC2 direction flip on C0
+            # wins for that candle even when SDIR points the other way.
+            from syssdirpxy import get_structure_direction
+            sdir = str(get_structure_direction(df).get("direction", "NONE")).upper()
+            if (signal == "BUY" and sdir == "BULL") or (signal == "SELL" and sdir == "BEAR"):
+                return signal
+
+            if len(mid) < 3 or pd.isna(mid.iloc[-3]):
+                return "NONE"
+            previous_signal = (
+                "BUY" if mid.iloc[-2] > mid.iloc[-3]
+                else "SELL" if mid.iloc[-2] < mid.iloc[-3]
+                else "NONE"
+            )
+            return signal if previous_signal in {"BUY", "SELL"} and previous_signal != signal else "NONE"
 
         if SYSINPXY_SIGNAL_MODE == "SDIR":
             return get_sdir_signals(df)[0]
