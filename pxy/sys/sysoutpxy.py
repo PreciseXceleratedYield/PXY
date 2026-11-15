@@ -27,6 +27,16 @@ def get_signal(df=None):
         if df is None or df.empty or "Close" not in df.columns:
             return "NONE"
 
+        if SYSOUTPXY_SIGNAL_MODE == "OC2":
+            # Pure OC2: compare running midpoint against previous midpoint, no TSMA.
+            if len(df) < 2 or "Open" not in df.columns:
+                return "NONE"
+            mid = (pd.to_numeric(df["Open"], errors="coerce") + pd.to_numeric(df["Close"], errors="coerce")) / 2.0
+            previous, current = mid.iloc[-2], mid.iloc[-1]
+            if pd.isna(previous) or pd.isna(current):
+                return "NONE"
+            return "BULL" if current > previous else "BEAR" if current < previous else "NONE"
+
         if SYSOUTPXY_SIGNAL_MODE == "STMT":
             states = get_stmt_states(df)
             return str(states.iloc[-1]) if not states.empty else "NONE"
