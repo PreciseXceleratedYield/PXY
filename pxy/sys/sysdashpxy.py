@@ -133,6 +133,7 @@ def get_full_snapshot(monitor=False):
     result["super_line"] = line_val
     indicator_signals = get_indicator_signals(processed_st_df)
     result["sma"] = indicator_signals["sma"]
+    result["sdir"] = indicator_signals["sdir"]
     result["tsma"] = indicator_signals["tsma"]
     result["df"] = processed_st_df
     # Web chart and indicator series use the shared DTHA candles.
@@ -216,11 +217,11 @@ def print_dashboard(data):
     print(Fore.WHITE + "CE Power:" + ce_c + str(ce) + " " * max(1, s_pw) + Fore.WHITE + "PE Power:" + pe_c + str(pe))
 
     # 8. INDEPENDENT INDICATOR STATUS
-    sma_status = data.get("sma", "NA")
+    sma_status = data.get("sdir", "NA")
     tsma_status = data.get("tsma", "NA")
     sma_color = Fore.LIGHTGREEN_EX if sma_status == "BULL" else Fore.LIGHTRED_EX if sma_status == "BEAR" else Fore.YELLOW
     tsma_color = Fore.LIGHTGREEN_EX if tsma_status == "BULL" else Fore.LIGHTRED_EX if tsma_status == "BEAR" else Fore.YELLOW
-    trend_label = SMA50_VARIANT if SMA50_VARIANT in {"SMA50", "ST50", "SDIR"} else "SMA50"
+    trend_label = "SDIR"
     s_ind = TOTAL_WIDTH - len(f"TSMA:{tsma_status}") - len(f"{trend_label}:{sma_status}")
     print(Fore.WHITE + "TSMA:" + tsma_color + tsma_status + " " * max(1, s_ind) + Fore.WHITE + trend_label + ":" + sma_color + sma_status)
 
