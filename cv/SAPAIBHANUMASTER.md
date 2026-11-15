@@ -8,7 +8,7 @@ Citizenship: Indian | Singapore Permanent Resident
 ## EXECUTIVE PROFILE
 SAP technology, cloud and enterprise transformation leader with 24+ years of experience across SAP Asia, Singapore, and Microsoft India. Background spanning SAP Basis and NetWeaver operations, SAP HANA, SAP S/4HANA conversion and upgrades, enterprise migration strategy, SAP on Microsoft Azure, technical program governance and executive customer advisory. Combines hands-on SAP platform expertise with architecture leadership, crisis management, pre-sales and business development.
 
-## VALUE PROPOSITION — TAILOR PAGE 1 ONLY
+## VALUE PROPOSITION
 ### TECHNICAL VALUE PROPOSITION
 SAP Basis, SAP NetWeaver, SAP HANA and SAP S/4HANA technology leader experienced in enterprise platform operations, upgrades, system conversion, migration planning, cutover governance and downtime optimization. Brings SAP on Microsoft Azure architecture and migration advisory, high availability and disaster recovery planning, SAP landscape governance, performance troubleshooting and critical production escalation expertise. Connects technical architecture decisions with delivery readiness, business continuity and measurable transformation outcomes.
 
