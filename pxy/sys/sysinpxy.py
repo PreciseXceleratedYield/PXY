@@ -47,7 +47,9 @@ def get_signal(df=None):
                 return "BUY"
             if state == "BEAR" and sdir == "BEAR":
                 return "SELL"
-            return "NONE"
+            # Preserve unaligned continuation as a directional state.
+            # The execution adapter only acts on BUY/SELL.
+            return state
 
         if SYSINPXY_SIGNAL_MODE == "SDIR":
             return get_sdir_signals(df)[0]
