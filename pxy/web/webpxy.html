@@ -1051,7 +1051,7 @@ async function loadChart(){
         const sdirDot=$("chartSdirDot");
         if(sdirDot){
             const latest=data[data.length-1];
-            const sdir=latest?.sma_variant==="SDIR"?String(latest.sma_trend||"").toUpperCase():"";
+            const sdir=latest?.sma_variant==="SDIR"?String(latest.sdir_trend||"").toUpperCase():"";
             sdirDot.style.background=sdir==="BULL"?"#16a34a":sdir==="BEAR"?"#dc4545":"var(--muted)";
             const label=sdir==="BULL"?"SDIR bullish":sdir==="BEAR"?"SDIR bearish":"SDIR direction unavailable";
             sdirDot.title=label;
