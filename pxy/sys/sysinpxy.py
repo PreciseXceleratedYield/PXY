@@ -22,32 +22,22 @@ def get_signal(df=None):
         # Live mode: include the forming candle in entry signals.
 
         if SYSINPXY_SIGNAL_MODE == "OC2":
-            # Pure OC2: compare running midpoint against previous midpoint, no TSMA.
-            if len(df) < 2 or "Open" not in df.columns:
+            # C1 and live C0 are green/red by their OC2 close versus
+            # the preceding candle's OC2 close. A reversal is an entry
+            # action; continuation is a directional state.
+            if len(df) < 3 or "Open" not in df.columns:
                 return "NONE"
             mid = (pd.to_numeric(df["Open"], errors="coerce") + pd.to_numeric(df["Close"], errors="coerce")) / 2.0
-            previous, current = mid.iloc[-2], mid.iloc[-1]
-            if pd.isna(previous) or pd.isna(current):
+            if mid.iloc[-3:].isna().any():
                 return "NONE"
-            signal = "BUY" if current > previous else "SELL" if current < previous else "NONE"
-            if signal == "NONE":
-                return "NONE"
-
-            # SDIR qualifies OC2 signals. A fresh OC2 direction flip on C0
-            # wins for that candle even when SDIR points the other way.
-            from syssdirpxy import get_structure_direction
-            sdir = str(get_structure_direction(df).get("direction", "NONE")).upper()
-            if (signal == "BUY" and sdir == "BULL") or (signal == "SELL" and sdir == "BEAR"):
-                return signal
-
-            if len(mid) < 3 or pd.isna(mid.iloc[-3]):
-                return "NONE"
-            previous_signal = (
-                "BUY" if mid.iloc[-2] > mid.iloc[-3]
-                else "SELL" if mid.iloc[-2] < mid.iloc[-3]
-                else "NONE"
-            )
-            return signal if previous_signal in {"BUY", "SELL"} and previous_signal != signal else "NONE"
+            previous = "GREEN" if mid.iloc[-2] > mid.iloc[-3] else "RED" if mid.iloc[-2] < mid.iloc[-3] else "NONE"
+            current = "GREEN" if mid.iloc[-1] > mid.iloc[-2] else "RED" if mid.iloc[-1] < mid.iloc[-2] else "NONE"
+            return {
+                ("GREEN", "RED"): "SELL",
+                ("RED", "RED"): "BEAR",
+                ("RED", "GREEN"): "BUY",
+                ("GREEN", "GREEN"): "BULL",
+            }.get((previous, current), "NONE")
 
         if SYSINPXY_SIGNAL_MODE == "SDIR":
             return get_sdir_signals(df)[0]
