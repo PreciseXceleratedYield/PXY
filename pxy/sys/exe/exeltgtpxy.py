@@ -47,7 +47,7 @@ def _warn_once(key, msg):
 
 # === SURGICAL CHANGE START (Error Fallbacks Added) ===
 def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=0.0, pe_investment=0.0, ce_pnl_pct=0.0, pe_pnl_pct=0.0, ce_capital=None, pe_capital=None, sma_direction="NA"):
-    """LGT = -2 * X * worth ratio; double CE in BEAR or PE in BULL selected SMA50."""
+    """LGT = -2 * X * worth ratio; SDIR doubles CE in BEAR or PE in BULL."""
     try:
         own_worth = float(ce_investment if is_ce else pe_investment)
         opposite_worth = float(pe_investment if is_ce else ce_investment)
@@ -58,7 +58,7 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
         else:
             ratio = own_worth / opposite_worth
         sma = str(sma_direction).upper().strip()
-        trend_factor = 3.0 if ((is_ce and sma == "BEAR") or (not is_ce and sma == "BULL")) else 1.0
+        trend_factor = 2.0 if ((is_ce and sma == "BEAR") or (not is_ce and sma == "BULL")) else 1.0
         raw_lgt = -2.0 * X * ratio * trend_factor
         return max(-99.0, min(99.0, raw_lgt))
     except (TypeError, ValueError, OverflowError, ZeroDivisionError) as e:
