@@ -103,4 +103,19 @@ As SAP Basis Consultant, Platinum Consultant, Technical Quality Manager and Esca
 **Customer Success & Operational Excellence:** Customer lifecycle engagement; adoption acceleration; service excellence; customer experience improvement; SLA governance; operational readiness; technical assurance; continuous improvement; issue prevention; performance reviews; customer retention strategy; long-term relationship management.
 
 ---
-**Master policy:** Only Page 1's role-specific value proposition may be tailored for applications. Preserve the work experience and all subsequent sections. SAP Asia is ONE employment record with ONE date range; internal positions are described in continuous paragraphs without separate headings or internal dates. Markdown headings do not prescribe exact PDF page breaks.
+## MANDATORY CV GENERATION RULES — READ BEFORE EVERY CV REQUEST
+
+**Authoritative source:** This file is the master CV. Always read it from GitHub before producing a master or job-tailored CV.
+
+**Mandatory four-page structure (hard page breaks, not just headings):**
+1. **Page 1:** Executive Profile and role-specific value proposition. For tailored CVs, use heading **WHY I AM A FIT FOR THIS ROLE**. Only Page 1 may be tailored.
+2. **Page 2:** **WORK EXPERIENCE** must start at the top of Page 2. Preserve all employment content and dates.
+3. **Page 3:** **EXECUTIVE ACCOMPLISHMENTS** must start at the top of Page 3; include certifications and education following it.
+4. **Page 4:** **TECHNICAL & LEADERSHIP SKILLS** must start at the top of Page 4; include Business & Leadership Skills following it.
+
+**Layout enforcement:** Insert explicit page breaks before WORK EXPERIENCE, EXECUTIVE ACCOMPLISHMENTS, and TECHNICAL & LEADERSHIP SKILLS. Never allow these sections to begin on another page. Fit content within its assigned page through typography and spacing adjustments while maintaining readability. Verify the rendered PDF page count and the first major heading on each page before delivery. Do not silently create spillover pages; disclose if layout cannot be achieved.
+
+**ATS / work history:** SAP Asia Pte Ltd is ONE employer, ONE consolidated role, ONE employment date range. Mention internal roles only within descriptive paragraphs, with no internal timelines or separate job headings. Microsoft India and Microsoft Singapore contract remain distinct employers/records.
+
+**Change control:** Do not modify pages 2–4 for job-specific applications without explicit user instruction. If the user approves changes to fixed sections, update this GitHub master first. Preserve the master content and page structure for all future PDFs/Word exports.
+
