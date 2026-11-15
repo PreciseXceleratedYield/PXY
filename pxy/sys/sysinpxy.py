@@ -38,18 +38,16 @@ def get_signal(df=None):
                 ("RED", "GREEN"): "BUY",
                 ("GREEN", "GREEN"): "BULL",
             }.get((previous, current), "NONE")
-            # OC2 flips always win. Only continuation states need SDIR alignment.
-            if state in {"BUY", "SELL", "NONE"}:
-                return state
+            # Every BUY/SELL action requires SDIR alignment, including flips.
+            # Unaligned OC2 direction remains BULL/BEAR (non-executable).
+            if state == "NONE":
+                return "NONE"
             from syssdirpxy import get_structure_direction
             sdir = str(get_structure_direction(df).get("direction", "NONE")).upper()
-            if state == "BULL" and sdir == "BULL":
-                return "BUY"
-            if state == "BEAR" and sdir == "BEAR":
-                return "SELL"
-            # Preserve unaligned continuation as a directional state.
-            # The execution adapter only acts on BUY/SELL.
-            return state
+            direction = "BULL" if state in {"BUY", "BULL"} else "BEAR"
+            if sdir == direction:
+                return "BUY" if direction == "BULL" else "SELL"
+            return direction
 
         if SYSINPXY_SIGNAL_MODE == "SDIR":
             return get_sdir_signals(df)[0]
