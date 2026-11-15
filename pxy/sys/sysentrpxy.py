@@ -96,7 +96,8 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     entry_sig = raw_entry if raw_entry in {"BUY", "SELL"} else "NONE"
     exit_sig = raw_exit if raw_exit in {"BULL", "BEAR", "SIDE"} else "NONE"
 
-    entry_sig = _qualify_entry(entry_sig, df)
+    # IN already applies SDIR alignment only to continuation candles.
+    # Never reject an OC2 flip with a second downstream SDIR gate.
     print(f"⏱️ IN: {entry_sig} | OUT: {exit_sig}")
     return _apply_new_cycle_cutoff(entry_sig, exit_sig, now_time)
 
