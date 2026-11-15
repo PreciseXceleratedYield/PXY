@@ -221,8 +221,8 @@ def print_dashboard(data):
     sma_color = Fore.LIGHTGREEN_EX if sma_status == "BULL" else Fore.LIGHTRED_EX if sma_status == "BEAR" else Fore.YELLOW
     tsma_color = Fore.LIGHTGREEN_EX if tsma_status == "BULL" else Fore.LIGHTRED_EX if tsma_status == "BEAR" else Fore.YELLOW
     trend_label = SMA50_VARIANT if SMA50_VARIANT in {"SMA50", "ST50", "SDIR"} else "SMA50"
-    s_ind = TOTAL_WIDTH - len(f"{trend_label}:{sma_status}") - len(f"TSMA:{tsma_status}")
-    print(Fore.WHITE + trend_label + ":" + sma_color + sma_status + " " * max(1, s_ind) + Fore.WHITE + "TSMA:" + tsma_color + tsma_status)
+    s_ind = TOTAL_WIDTH - len(f"TSMA:{tsma_status}") - len(f"{trend_label}:{sma_status}")
+    print(Fore.WHITE + "TSMA:" + tsma_color + tsma_status + " " * max(1, s_ind) + Fore.WHITE + trend_label + ":" + sma_color + sma_status)
 
     # 9. LIVE ORDER SIGNALS (FINAL STATUS ROW)
     ent, ext = data["entry"], data["exit"]
