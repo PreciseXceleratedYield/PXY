@@ -17,7 +17,7 @@ SAP technology business development and customer advisory leader with experience
 
 ---
 
-## WORK EXPERIENCE — FIXED MASTER CONTENT
+## WORK EXPERIENCE
 ### SAP Principal Practice Architect – SAP Migration (Azure)
 **Microsoft | India**  
 **June 2025 – October 2026**
@@ -34,19 +34,19 @@ Led the APAC Microsoft and SAP RAP program initiative to accelerate RISE with SA
 **SAP Asia Pte Ltd | Singapore**  
 **April 2001 – May 2024**
 
-As Regional Director for S/4HANA Cloud Adoption and Customer Engagements, led enterprise SAP transformation initiatives, advising customers and executive stakeholders on S/4HANA adoption, cloud modernization, migration strategies and technology roadmaps. Worked closely with customers and partners to align SAP technology investments with business priorities and transformation outcomes.
+As Regional Director for S/4HANA Cloud Adoption and Customer Engagements, led enterprise transformation advisory spanning SAP S/4HANA, RISE with SAP, SAP ECC modernization, SAP Business Suite transition, SAP HANA, hybrid cloud and SAP on Microsoft Azure. Guided migration strategy (greenfield, brownfield and selective data transition), SAP Readiness Check, simplification assessment, clean-core principles, SAP BTP and SAP Cloud ALM considerations, enterprise application integration, HA/DR, business continuity, adoption roadmaps and executive transformation governance. Advised on SAP Fiori, analytics, security, identity and cross-application dependencies, distinguishing solution-level advisory from hands-on platform administration.
 
-As Director of Technology for Partner Engagements, drove strategic technology partnerships, solution advisory, business development and go-to-market initiatives. Collaborated with SAP customers, hyperscalers and consulting partners to accelerate enterprise technology adoption, strengthen strategic relationships and develop transformation opportunities.
+As Director of Technology for Partner Engagements, drove SAP technology partnerships, pre-sales solution advisory, go-to-market strategy and hyperscaler collaboration across SAP S/4HANA, SAP HANA, SAP BTP, Azure, hybrid cloud and enterprise integration. Engaged partners and customers on SAP PI/PO, Integration Suite / Cloud Integration (CPI), API Management, OData, RFC, IDoc, BAPI, SAP Gateway, Fiori, SAP Cloud Connector, identity and access management, data platforms and analytics as relevant architecture and ecosystem considerations. Supported technical discovery, solution workshops, RFP/RFI responses, business cases, TCO/ROI discussions, partner enablement, executive engagement and modernization pipeline development.
 
-As Program Manager for the Global Upgrade Office, led global SAP upgrade programs, establishing delivery governance, technical assurance, migration methodologies and transformation readiness frameworks. Coordinated complex enterprise initiatives involving multiple stakeholders, technical teams and customer environments.
+As Program Manager for the Global Upgrade Office, led global SAP lifecycle, NetWeaver and SAP Business Suite upgrade programs, establishing delivery governance, technical assurance, upgrade methodologies, cutover playbooks and transformation readiness. Governed Software Update Manager (SUM), Database Migration Option (DMO), Software Provisioning Manager (SWPM), Maintenance Planner, SAP Readiness Check, SPDD/SPAU remediation, Unicode and enhancement-package upgrades, system copy, OS/DB migration, SAP transport management (STMS), retrofit, dual maintenance and post-upgrade validation. Coordinated sandbox rehearsals, mock cutovers, downtime optimization, near-zero downtime (NZDT) options, hypercare, release governance, change control and executive risk reporting.
 
-As Technical Project Manager for the Upgrade Competency Center, managed end-to-end SAP technical upgrades, system conversions, migration planning, downtime optimization, cutover governance and technical delivery coordination across complex SAP landscapes.
+As Technical Project Manager for the Upgrade Competency Center, managed end-to-end SAP technical upgrades, system conversions and migrations across SAP ECC, SAP R/3, SAP NetWeaver, AS ABAP, AS Java and heterogeneous database/operating-system landscapes. Coordinated SAP HANA migration readiness, SAP kernel and support-package upgrades (SPAM/SAINT), SUM/DMO execution planning, SWPM provisioning, Unicode conversion, system refreshes, SAP transport sequencing, technical dependencies and integration validation. Directed cutover command centers, downtime minimization, backup/recovery preparedness, high availability/disaster recovery (HA/DR), technical acceptance, service transition and production hypercare.
 
-As SAP Basis Consultant, Platinum Consultant, Technical Quality Manager and Escalation Architect, delivered SAP Basis and NetWeaver consulting, system administration, technical troubleshooting, performance optimization, root-cause analysis and mission-critical production support. Managed complex customer escalations, protected business continuity and supported enterprise SAP landscape stability.
+As SAP Basis Consultant, Platinum Consultant, Technical Quality Manager and Escalation Architect, delivered SAP Basis and SAP NetWeaver operations, AS ABAP / AS Java administration, SAP ECC and SAP Business Suite production support, SAP HANA and relational database troubleshooting, performance tuning, root-cause analysis and critical escalation recovery. Worked across SAP Web Dispatcher, SAP Gateway, ICM, Message Server, Enqueue Server, SAP Start Service, SAPControl, SAP Host Agent, SAProuter, RFC/tRFC/qRFC, background jobs, spool, work processes, profile parameters, transport management, kernel updates and system copies. Applied SAP diagnostic and administration tools including ST22, SM21, SM37, SM50, SM66, SM12, SM13, SM59, SMQ1/SMQ2, SMICM, ST03N, STAD, ST05, ST06, RZ10/RZ11, RZ20/CCMS, SNOTE, STMS, SCC4 and client copy tools. Addressed SAP HANA system replication, backup and recovery, memory and SQL performance, database compatibility, SAP authorizations, SSO, certificates, SAP Security Notes, change governance, ITIL incident/problem management, SLA assurance and business continuity as applicable to customer environments.
 
 ---
 
-## EXECUTIVE ACCOMPLISHMENTS
+### EXECUTIVE ACCOMPLISHMENTS
 - **Enterprise modernization:** Led large-scale transformation initiatives to simplify complex operations and deliver business value.
 - **Architecture leadership:** Combined strategic advisory, delivery governance and hands-on technical depth to improve solution quality and reduce deployment risk.
 - **Crisis management:** Steered 100+ critical SAP production situations and global escalations to protect continuity and restore customer confidence.
@@ -54,19 +54,7 @@ As SAP Basis Consultant, Platinum Consultant, Technical Quality Manager and Esca
 - **Revenue protection:** Safeguarded €1.6B in SAP support revenue and supported €100M+ in annual recovery through retention, win-back and account recovery.
 - **Thought leadership:** Delivered 100+ SAP conference, customer forum and industry presentations, translating technical innovation into executive narratives.
 
-## CERTIFICATIONS
-**Microsoft Azure:** Azure for SAP Workloads Specialty; Azure Database Administrator Associate.
-
-**SAP Transformation:** SAP S/4HANA Conversion and Upgrade; E2E Technical Upgrade Management; Change Control & Root Cause Analysis.
-
-**SAP Platform:** System Administration (HANA & NetWeaver); NetWeaver Support Consultant; R/3 Service Consultant; Exchange Infrastructure.
-
-## EDUCATION
-**Master of Business Administration (MBA)** — Operations Management, Sri Krishnadevaraya University, Ananthapur, India (1994–1996).
-
-**Bachelor of Technology (B.Tech)** — Mechanical Engineering, Sri Krishnadevaraya University, Ananthapur, India (1990–1994).
-
-## TECHNICAL & LEADERSHIP SKILLS
+### TECHNICAL & LEADERSHIP SKILLS
 **SAP Basis & Platform Administration:** SAP Basis; SAP NetWeaver; SAP HANA Administration; SAP R/3; SAP S/4HANA; SAP Fiori Launchpad; SAP BTP; SAP Solution Manager 7.2; ChaRM; SolDoc; SAP Cloud ALM; SAP Landscape Management (LaMa); Transport Management System (TMS); Kernel Upgrades; System Copy; System Refresh; Performance Tuning; SAP Production Support.
 
 **SAP Lifecycle, Upgrades & Migration:** S/4HANA System Conversion; SAP Upgrades; RISE with SAP; SAP Activate; Software Update Manager (SUM); Database Migration Option (DMO); OS/DB Migration; Homogeneous and Heterogeneous System Copy; Technical Migration Planning; Cutover Governance; Downtime Optimization; Near-Zero Downtime (NZDT); Dual Maintenance; Retrofit; Landscape Harmonization.
@@ -83,7 +71,7 @@ As SAP Basis Consultant, Platinum Consultant, Technical Quality Manager and Esca
 
 **Architecture, Programs & Leadership:** SAP Enterprise Architecture; Target-State Architecture; SAP Transformation Strategy; SAP Technical Program Management; Global Delivery Governance; Executive Advisory; CIO/CTO Engagement; Partner Management; Vendor Management; Pre-Sales Advisory; Solutioning; Service-Level Agreements (SLAs); Escalation Governance; Crisis Management; Competency Development; Portfolio Management; Technical Presentations.
 
-## BUSINESS & LEADERSHIP SKILLS
+### BUSINESS & LEADERSHIP SKILLS
 **Pre-Sales & Solution Advisory:** SAP technical pre-sales; customer discovery; solution positioning; solution architecture advisory; proposal development; RFP/RFI response support; technical solutioning; migration assessments; estimation and sizing; solution workshops; executive presentations; technical risk assessment; business-case support.
 
 **Business Development & Growth:** Technology business development; strategic account engagement; opportunity identification; pipeline development; customer retention; win-back initiatives; account recovery; cross-sell and upsell support; strategic partnerships; co-innovation; revenue protection; enterprise modernization opportunities.
@@ -102,20 +90,26 @@ As SAP Basis Consultant, Platinum Consultant, Technical Quality Manager and Esca
 
 **Customer Success & Operational Excellence:** Customer lifecycle engagement; adoption acceleration; service excellence; customer experience improvement; SLA governance; operational readiness; technical assurance; continuous improvement; issue prevention; performance reviews; customer retention strategy; long-term relationship management.
 
+## CERTIFICATIONS
+**Microsoft Azure:** Azure for SAP Workloads Specialty; Azure Database Administrator Associate.
+
+**SAP Transformation:** SAP S/4HANA Conversion and Upgrade; E2E Technical Upgrade Management; Change Control & Root Cause Analysis.
+
+**SAP Platform:** System Administration (HANA & NetWeaver); NetWeaver Support Consultant; R/3 Service Consultant; Exchange Infrastructure.
+
+## EDUCATION
+**Master of Business Administration (MBA)** — Operations Management, Sri Krishnadevaraya University, Ananthapur, India (1994–1996).
+
+**Bachelor of Technology (B.Tech)** — Mechanical Engineering, Sri Krishnadevaraya University, Ananthapur, India (1990–1994).
+
+
 ---
 ## MANDATORY CV GENERATION RULES — READ BEFORE EVERY CV REQUEST
 
-**Authoritative source:** This file is the master CV. Always read it from GitHub before producing a master or job-tailored CV.
+**Authoritative source:** Always read this GitHub master before producing a master or job-tailored CV.
 
-**Mandatory four-page structure (hard page breaks, not just headings):**
-1. **Page 1:** Executive Profile and role-specific value proposition. For tailored CVs, use heading **WHY I AM A FIT FOR THIS ROLE**. Only Page 1 may be tailored.
-2. **Page 2:** **WORK EXPERIENCE** must start at the top of Page 2. Preserve all employment content and dates.
-3. **Page 3:** **EXECUTIVE ACCOMPLISHMENTS** must start at the top of Page 3; include certifications and education following it.
-4. **Page 4:** **TECHNICAL & LEADERSHIP SKILLS** must start at the top of Page 4; include Business & Leadership Skills following it.
+**Four-page target and content hierarchy:** Page 1 contains the executive profile and value proposition; for tailored CVs, title the value proposition **WHY I AM A FIT FOR THIS ROLE**. Start **WORK EXPERIENCE** on Page 2. Within WORK EXPERIENCE, retain employment history followed by three subordinate sections: **EXECUTIVE ACCOMPLISHMENTS**, **TECHNICAL & LEADERSHIP SKILLS**, and **BUSINESS & LEADERSHIP SKILLS**. **CERTIFICATIONS** and **EDUCATION** are independent main sections following the entire WORK EXPERIENCE group. Flow continuously from Page 2 onward without forced breaks or large blank areas; target four readable ATS-friendly pages and check the last-page fill, but do not sacrifice readability or invent experience merely to fill space.
 
-**Layout enforcement:** Insert explicit page breaks before WORK EXPERIENCE, EXECUTIVE ACCOMPLISHMENTS, and TECHNICAL & LEADERSHIP SKILLS. Never allow these sections to begin on another page. Fit content within its assigned page through typography and spacing adjustments while maintaining readability. Verify the rendered PDF page count and the first major heading on each page before delivery. Do not silently create spillover pages; disclose if layout cannot be achieved.
+**ATS / work history:** SAP Asia Pte Ltd is ONE employer, ONE consolidated role, ONE employment date range. Mention internal roles within descriptive paragraphs only; no internal dates or separate employer entries. Microsoft India and Microsoft Singapore contract remain separate records. Preserve truthful distinctions between hands-on delivery, program governance, advisory exposure, and ecosystem familiarity; keyword coverage is not a claim of hands-on proficiency with every named product.
 
-**ATS / work history:** SAP Asia Pte Ltd is ONE employer, ONE consolidated role, ONE employment date range. Mention internal roles only within descriptive paragraphs, with no internal timelines or separate job headings. Microsoft India and Microsoft Singapore contract remain distinct employers/records.
-
-**Change control:** Do not modify pages 2–4 for job-specific applications without explicit user instruction. If the user approves changes to fixed sections, update this GitHub master first. Preserve the master content and page structure for all future PDFs/Word exports.
-
+**Change control:** Tailor Page 1 only for job-specific applications unless the user explicitly requests changes to other sections. Do not silently modify the approved master experience or skills; verify exported PDF page count and readable text.
