@@ -3,9 +3,7 @@ from pathlib import Path
 import sys
 
 from sysmktpxy import get_signals as get_market_signals
-from sysdirpxy import detect_raw_direction
 from sysmrngpxy import get_morning_direction
-from sysbbospxy import get_bos_bar
 from sysictrpxy import calculate_indicators, get_indicator_signals
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
@@ -94,34 +92,6 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     raw_entry, raw_exit = get_market_signals(df)
     raw_entry = str(raw_entry).upper().strip()
     raw_exit = str(raw_exit).upper().strip()
-
-    # Additional IN trigger: opposite raw direction versus current OUT state.
-    # Leave OUT unchanged.
-    if raw_exit in {"BULL", "BEAR"}:
-        try:
-            _, raw_direction = detect_raw_direction(df)
-            raw_direction = str(raw_direction).upper().strip()
-            if raw_exit == "BULL" and raw_direction == "DOWN":
-                raw_entry = "BUY"
-            elif raw_exit == "BEAR" and raw_direction == "UP":
-                raw_entry = "SELL"
-        except Exception as exc:
-            print(f"⚠️ IN direction cross-check unavailable: {exc}")
-
-    # Breakout signals take priority over existing IN signals after 09:30.
-    # BOS labels remain MBUY/MSELL until its configured morning end (10:10),
-    # so include those labels to avoid a 09:30-10:10 priority gap.
-    # OUT and all risk/time gates remain unchanged.
-    if now_time >= MORNING_OVERRIDE_END:
-        try:
-            _, bos_signal = get_bos_bar(df)
-            bos_signal = str(bos_signal).upper().strip()
-            if bos_signal in {"NBUY", "MBUY"}:
-                raw_entry = "BUY"
-            elif bos_signal in {"NSELL", "MSELL"}:
-                raw_entry = "SELL"
-        except Exception as exc:
-            print(f"⚠️ Breakout entry priority unavailable: {exc}")
 
     entry_sig = raw_entry if raw_entry in {"BUY", "SELL"} else "NONE"
     exit_sig = raw_exit if raw_exit in {"BULL", "BEAR", "SIDE"} else "NONE"
