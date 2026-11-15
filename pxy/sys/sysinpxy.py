@@ -22,33 +22,20 @@ def get_signal(df=None):
         # Live mode: include the forming candle in entry signals.
 
         if SYSINPXY_SIGNAL_MODE == "OC2":
-            # C1 and live C0 are green/red by their OC2 close versus
-            # the preceding candle's OC2 close. A reversal is an entry
-            # action; continuation is a directional state.
-            if len(df) < 3 or "Open" not in df.columns:
-                return "NONE"
-            mid = (pd.to_numeric(df["Open"], errors="coerce") + pd.to_numeric(df["Close"], errors="coerce")) / 2.0
-            if mid.iloc[-3:].isna().any():
-                return "NONE"
-            previous = "GREEN" if mid.iloc[-2] > mid.iloc[-3] else "RED" if mid.iloc[-2] < mid.iloc[-3] else "NONE"
-            current = "GREEN" if mid.iloc[-1] > mid.iloc[-2] else "RED" if mid.iloc[-1] < mid.iloc[-2] else "NONE"
-            state = {
-                ("GREEN", "RED"): "SELL",
-                ("RED", "RED"): "BEAR",
-                ("RED", "GREEN"): "BUY",
-                ("GREEN", "GREEN"): "BULL",
-            }.get((previous, current), "NONE")
-            # Preserve original OC2 BUY/SELL/NONE unchanged.
-            # SDIR only promotes aligned continuation states to BUY/SELL.
-            if state in {"BUY", "SELL", "NONE"}:
-                return state
+            # Share OUT's OC2 directional calculation (including live C0).
+            # DTHA transforms the candles once; IN only promotes direction
+            # when SDIR agrees. No independent reversal/flip entry rule.
+            from sysoutpxy import get_signal as get_out_direction
+            direction = get_out_direction(df)
+            if direction not in {"BULL", "BEAR"}:
+                return direction if direction == "NONE" else "NONE"
             from syssdirpxy import get_structure_direction
             sdir = str(get_structure_direction(df).get("direction", "NONE")).upper()
-            if state == "BULL" and sdir == "BULL":
+            if direction == "BULL" and sdir == "BULL":
                 return "BUY"
-            if state == "BEAR" and sdir == "BEAR":
+            if direction == "BEAR" and sdir == "BEAR":
                 return "SELL"
-            return state
+            return direction
 
         if SYSINPXY_SIGNAL_MODE == "SDIR":
             return get_sdir_signals(df)[0]
