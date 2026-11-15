@@ -28,14 +28,16 @@ def get_signal(df=None):
             return "NONE"
 
         if SYSOUTPXY_SIGNAL_MODE == "OC2":
-            # Pure OC2: compare running midpoint against previous midpoint, no TSMA.
-            if len(df) < 2 or "Open" not in df.columns:
+            # DTHA owns OC2 conversion. Never calculate an OC2 midpoint again.
+            # transform_dtha_ohlc is idempotent for an already-tagged OC2 frame.
+            candles = transform_dtha_ohlc(df)
+            if len(candles) < 2:
                 return "NONE"
-            mid = (pd.to_numeric(df["Open"], errors="coerce") + pd.to_numeric(df["Close"], errors="coerce")) / 2.0
-            previous, current = mid.iloc[-2], mid.iloc[-1]
+            closes = pd.to_numeric(candles["Close"], errors="coerce")
+            previous, current = closes.iloc[-2], closes.iloc[-1]
             if pd.isna(previous) or pd.isna(current):
                 return "NONE"
-            return "BULL" if current > previous else "BEAR" if current < previous else "NONE"
+            return "BULL" if current > previous else "BEAR" if current < previous else "SIDE"
 
         if SYSOUTPXY_SIGNAL_MODE == "STMT":
             states = get_stmt_states(df)
