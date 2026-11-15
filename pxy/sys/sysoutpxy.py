@@ -37,7 +37,20 @@ def get_signal(df=None):
             previous, current = closes.iloc[-2], closes.iloc[-1]
             if pd.isna(previous) or pd.isna(current):
                 return "NONE"
-            return "BULL" if current > previous else "BEAR" if current < previous else "SIDE"
+            if current > previous:
+                return "BULL"
+            if current < previous:
+                return "BEAR"
+            # Flat running candle: retain the most recent non-flat OC2 direction.
+            for idx in range(len(closes) - 2, 0, -1):
+                earlier, later = closes.iloc[idx - 1], closes.iloc[idx]
+                if pd.isna(earlier) or pd.isna(later):
+                    return "NONE"
+                if later > earlier:
+                    return "BULL"
+                if later < earlier:
+                    return "BEAR"
+            return "NONE"
 
         if SYSOUTPXY_SIGNAL_MODE == "STMT":
             states = get_stmt_states(df)
