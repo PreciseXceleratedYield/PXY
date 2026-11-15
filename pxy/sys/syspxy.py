@@ -97,7 +97,7 @@ def get_all_data():
     # optional market entry filter. The trading filter remains unchanged.
     from syscnfgpxy import SMA50_VARIANT
     filter_mode = SMA50_VARIANT
-    filter_state = str(core.get("sma", "NA")).upper().strip()
+    filter_state = str(core.get("sdir" if filter_mode == "SDIR" else "sma", "NA")).upper().strip()
     if filter_state not in {"BULL", "BEAR"}:
         filter_state = "NONE" if filter_mode == "SDIR" else "NA"
 
@@ -123,6 +123,7 @@ def get_all_data():
         "entry_filter_state": filter_state,
         "super_line": core.get("super_line"),
         "sma": core.get("sma", "NA"),
+        "sdir": core.get("sdir", "NA"),
         "tsma": core.get("tsma", "NA"),
 
         "ce_power": core.get("ce_power"),
