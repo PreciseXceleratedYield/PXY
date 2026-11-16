@@ -92,9 +92,14 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Both CE and PE open: fixed 28% per-side target, independent of
-        # OUT/SDIR alignment, counts, worth, or time of day.
+        # Dual-side positions: use 1.4% only when BOTH OUT and SDIR
+        # oppose this option side; otherwise target 28%.
         if both_sides_open:
+            out = str(exit_signal or "").upper().strip()
+            sdir = str(tsma_state or "").upper().strip()
+            opposing = "BEAR" if is_ce is True else "BULL" if is_ce is False else None
+            if opposing is not None and out == opposing and sdir == opposing:
+                return 1.4
             return 28.0
 
         # Preserve the existing late-day override for single-side positions.
