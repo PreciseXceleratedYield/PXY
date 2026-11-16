@@ -92,17 +92,21 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # With both option sides open, only agreement between SDIR and OUT
-        # awards 99% to the matching side; every other target is X/10 (1.4%).
+        # Dual-side targets: OUT and SDIR both aligned = 99%;
+        # OUT aligned but SDIR not aligned = 2.4%; otherwise = 1.4%.
         # This rule takes precedence over the late-day single-side override.
         if both_sides_open:
             direction = str(tsma_state or "").upper().strip()
             out = str(exit_signal or "").upper().strip()
-            confirmed = direction == out and (
+            out_aligned = (
                 (is_ce is True and out == "BULL")
                 or (is_ce is False and out == "BEAR")
             )
-            return EXETGTPXY_PRD_MAX_TARGET_PCT if confirmed else X / 10.0
+            if out_aligned and direction == out:
+                return EXETGTPXY_PRD_MAX_TARGET_PCT
+            if out_aligned:
+                return 2.4
+            return X / 10.0
 
         # Preserve the existing late-day override for single-side positions.
         if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
