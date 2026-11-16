@@ -201,8 +201,16 @@ isBullish = transClose >= nz(transClose[1], transClose)
 c_body    = isBullish ? softGreen : softRed
 c_glow    = isBullish ? softGreenGlow : softRedGlow
 
+// HYPR-only visual wick adjustment. Keep raw OHLC and all signal calculations unchanged.
+bool hyperVisualOnly = modeSelector == "Mode 0: Hyper-Sensitive Modified Close"
+float visualHigh = hyperVisualOnly and not isBullish ? displayOpen : high
+float visualLow  = hyperVisualOnly and isBullish ? displayOpen : low
+// Pine requires high/low to enclose the candle body, including on momentum-color reversals.
+visualHigh := math.max(visualHigh, displayOpen, transClose)
+visualLow  := math.min(visualLow, displayOpen, transClose)
+
 // Render Candlesticks
-plotcandle(plotCustomCandles ? displayOpen : na, plotCustomCandles ? high : na, plotCustomCandles ? low : na, plotCustomCandles ? transClose : na, 
+plotcandle(plotCustomCandles ? displayOpen : na, plotCustomCandles ? visualHigh : na, plotCustomCandles ? visualLow : na, plotCustomCandles ? transClose : na,
            title="Transformed Candle Layer", color=c_body, wickcolor=c_glow, bordercolor=c_glow)
 
 // Plot Support / Resistance Matrix Boundaries
