@@ -399,8 +399,6 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             reasons.append("target square-off disabled")
         if not metrics["both_sides_open"]:
             reasons.append("both CE and PE must be open")
-        if not metrics["both_sides_negative"]:
-            reasons.append("both open sides must have negative P&L percentages")
         if metrics["premium_paid"] <= 0:
             reasons.append("cycle premium missing")
         if metrics["cycle_trade_count"] <= 0:
