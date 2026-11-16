@@ -175,13 +175,13 @@ if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "LH2", "PIPE", "OCC3", "HKIN", "
 # Original IN/OUT choices apply to all non-TSMA DTHA candle modes.
 SYSINPXY_ORIGINAL_SIGNAL_MODE = "SUPR"
 SYSOUTPXY_ORIGINAL_SIGNAL_MODE = "SUPR"
-# Use SUPR for both channels independently of the DTHA candle transformation.
-SYSINPXY_SIGNAL_MODE = "OC2"
-SYSOUTPXY_SIGNAL_MODE = "OC2"
-if SYSINPXY_SIGNAL_MODE not in {"OC2", "TSMAC0", "TSMAC1", "SUPR", "PIPE", "SDIR"}:
-    raise ValueError("SYSINPXY_SIGNAL_MODE must be OC2, TSMAC0, TSMAC1, SUPR, PIPE or SDIR.")
-if SYSOUTPXY_SIGNAL_MODE not in {"OC2", "TSMAC0", "TSMAC1", "SUPR", "PIPE", "SDIR"}:
-    raise ValueError("SYSOUTPXY_SIGNAL_MODE must be OC2, TSMAC0, TSMAC1, SUPR, PIPE or SDIR.")
+# DTHA signal mode uses the configured transformed candles for both channels.
+SYSINPXY_SIGNAL_MODE = "DTHA"
+SYSOUTPXY_SIGNAL_MODE = "DTHA"
+if SYSINPXY_SIGNAL_MODE not in {"DTHA", "OC2", "TSMAC0", "TSMAC1", "SUPR", "PIPE", "SDIR"}:
+    raise ValueError("SYSINPXY_SIGNAL_MODE must be DTHA, OC2, TSMAC0, TSMAC1, SUPR, PIPE or SDIR.")
+if SYSOUTPXY_SIGNAL_MODE not in {"DTHA", "OC2", "TSMAC0", "TSMAC1", "SUPR", "PIPE", "SDIR"}:
+    raise ValueError("SYSOUTPXY_SIGNAL_MODE must be DTHA, OC2, TSMAC0, TSMAC1, SUPR, PIPE or SDIR.")
 # Controls inclusion of the forming candle in DTHA analyses.
 SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
