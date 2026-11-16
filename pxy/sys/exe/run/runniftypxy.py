@@ -24,22 +24,27 @@ ATM_BUFFER = RUNNIFTYPXY_ATM_BUFFER
 # ---------------- HELPERS ----------------
 
 def get_target_tuesday():
+    """Return the next scheduled Tuesday, adjusted to the preceding F&O trading day."""
     today = datetime.now(SYSCNFGPXY_TIMEZONE).date()
     days_until_tue = (1 - today.weekday() + 7) % 7
 
-    if today.weekday() <= 1:
-        days_until_tue += 7
+    # Preserve existing policy: Tuesday itself selects the following week's expiry.
+    if today.weekday() == 1:
+        days_until_tue = 7
 
-    target_tue = today + timedelta(days=days_until_tue)
-
-    while target_tue in get_nse_fo_holidays():
-        target_tue -= timedelta(days=1)
-
-    return target_tue
+    scheduled_tue = today + timedelta(days=days_until_tue)
+    holidays = get_nse_fo_holidays()
+    expiry = scheduled_tue
+    while expiry.weekday() >= 5 or expiry in holidays:
+        expiry -= timedelta(days=1)
+    return expiry
 
 
 def is_monthly_expiry(expiry_date):
-    return (expiry_date + timedelta(days=7)).month != expiry_date.month
+    """Identify monthly expiry by its scheduled last Tuesday, before holiday adjustment."""
+    # The adjusted expiry may be Monday (or earlier) when Tuesday is a holiday.
+    scheduled_tue = expiry_date + timedelta(days=(1 - expiry_date.weekday()) % 7)
+    return (scheduled_tue + timedelta(days=7)).month != scheduled_tue.month
 
 
 def round_to_strike(price):
