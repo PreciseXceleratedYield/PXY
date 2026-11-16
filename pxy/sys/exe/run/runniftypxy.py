@@ -28,9 +28,9 @@ def get_target_tuesday():
     today = datetime.now(SYSCNFGPXY_TIMEZONE).date()
     days_until_tue = (1 - today.weekday() + 7) % 7
 
-    # Preserve existing policy: Tuesday itself selects the following week's expiry.
-    if today.weekday() == 1:
-        days_until_tue = 7
+    # Preserve existing policy: Monday/Tuesday select the following week's expiry.
+    if today.weekday() <= 1:
+        days_until_tue += 7
 
     scheduled_tue = today + timedelta(days=days_until_tue)
     holidays = get_nse_fo_holidays()
