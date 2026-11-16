@@ -21,8 +21,8 @@ def get_signal(df=None):
 
         # Live mode: include the forming candle in entry signals.
 
-        if SYSINPXY_SIGNAL_MODE == "OC2":
-            # Share OUT's OC2 directional calculation (including live C0).
+        if SYSINPXY_SIGNAL_MODE in {"DTHA", "OC2"}:
+            # Share OUT's DTHA directional calculation (including live C0).
             # DTHA transforms the candles once; IN only promotes direction
             # when SDIR agrees. No independent reversal/flip entry rule.
             from sysoutpxy import get_signal as get_out_direction
