@@ -90,10 +90,10 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Fixed per-side target whenever both CE and PE are open.
-        # OUT and SDIR alignment do not affect this target.
+        # Keep individual profit exits at 99% while both CE and PE are open.
+        # Risk-bar and scheduled square-off remain independent.
         if both_sides_open:
-            return 28.0
+            return 99.0
 
         # Preserve the existing late-day override for single-side positions.
         if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
