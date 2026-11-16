@@ -380,7 +380,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     # Pending liquidations resume earlier in _tick regardless of signal.
     # New RiskBar liquidations can start regardless of OUT signal.
     risk_enabled = (
-        current_time >= dt_time(9, 30)
+        current_time >= dt_time(9, 15)
         and RISK_CANDLE_CONTROL_ENABLED
         and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
         and metrics["both_sides_open"]
@@ -391,8 +391,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     # Diagnostic only: no changes to order execution or liquidation gates.
     if metrics["cycle_pnl"] >= risk_target and not metrics["target_reached"]:
         reasons = []
-        if current_time < dt_time(9, 30):
-            reasons.append("RiskBar starts at 09:30 IST")
+        if current_time < dt_time(9, 15):
+            reasons.append("RiskBar starts at 09:15 IST")
         if not RISK_CANDLE_CONTROL_ENABLED:
             reasons.append("controller disabled")
         if not RUNEXACPXY_TARGET_SQUAREOFF_ENABLED:
