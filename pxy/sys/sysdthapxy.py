@@ -44,16 +44,6 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     if any(column not in df.columns for column in required):
         raise ValueError("DTHA requires Open, High, Low, and Close columns.")
 
-    numeric = df.loc[:, list(required)].apply(pd.to_numeric, errors="coerce")
-    if not np.isfinite(numeric.to_numpy(dtype=float)).all():
-        raise ValueError("DTHA requires finite numeric OHLC candles.")
-    if not (
-        (numeric > 0).all().all()
-        and (numeric["High"] >= numeric[["Open", "Low", "Close"]].max(axis=1)).all()
-        and (numeric["Low"] <= numeric[["Open", "High", "Close"]].min(axis=1)).all()
-    ):
-        raise ValueError("DTHA received invalid OHLC ranges.")
-
     prior_mode = df.attrs.get("pxy_dtha_mode")
     if prior_mode is not None:
         prior_signature = df.attrs.get("pxy_dtha_signature")
@@ -69,6 +59,16 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         if prior_mode != mode:
             raise ValueError("Cannot transform an already transformed frame to another mode.")
         return df.copy()
+    numeric = df.loc[:, list(required)].apply(pd.to_numeric, errors="coerce")
+    if not np.isfinite(numeric.to_numpy(dtype=float)).all():
+        raise ValueError("DTHA requires finite numeric OHLC candles.")
+    if not (
+        (numeric > 0).all().all()
+        and (numeric["High"] >= numeric[["Open", "Low", "Close"]].max(axis=1)).all()
+        and (numeric["Low"] <= numeric[["Open", "High", "Close"]].min(axis=1)).all()
+    ):
+        raise ValueError("DTHA received invalid OHLC ranges.")
+
     out = df.copy()
     raw_open = pd.to_numeric(out["Open"], errors="coerce").to_numpy(dtype=float)
     raw_high = pd.to_numeric(out["High"], errors="coerce").to_numpy(dtype=float)
