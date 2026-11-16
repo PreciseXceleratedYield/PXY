@@ -27,9 +27,8 @@ def get_signal(df=None):
         if df is None or df.empty or "Close" not in df.columns:
             return "NONE"
 
-        if SYSOUTPXY_SIGNAL_MODE == "OC2":
-            # DTHA owns OC2 conversion. Never calculate an OC2 midpoint again.
-            # transform_dtha_ohlc is idempotent for an already-tagged OC2 frame.
+        if SYSOUTPXY_SIGNAL_MODE in {"DTHA", "OC2"}:
+            # DTHA owns candle conversion; never transform an already-tagged frame again.
             candles = transform_dtha_ohlc(df)
             if len(candles) < 2:
                 return "NONE"
@@ -41,7 +40,7 @@ def get_signal(df=None):
                 return "BULL"
             if current < previous:
                 return "BEAR"
-            # Flat running candle: retain the most recent non-flat OC2 direction.
+            # Flat running candle: retain the most recent non-flat DTHA direction.
             for idx in range(len(closes) - 2, 0, -1):
                 earlier, later = closes.iloc[idx - 1], closes.iloc[idx]
                 if pd.isna(earlier) or pd.isna(later):
