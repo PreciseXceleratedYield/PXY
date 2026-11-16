@@ -32,10 +32,10 @@ def _dtha_ohlc_signature(df):
 
 
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
-    """Transform raw market OHLC once using one of nine pure candle modes."""
-    valid_modes = {"RAW", "OC2", "LH2", "PIPE", "OCC3", "OHLC4", "HKIN", "HYPR", "TSMA"}
+    """Transform raw market OHLC once using the configured pure candle mode."""
+    valid_modes = {"RAW", "OC0", "OC2", "LH2", "PIPE", "OCC3", "OHLC4", "HKIN", "HYPR", "TSMA"}
     if mode not in valid_modes:
-        raise ValueError("DTHA mode must be RAW, OC2, LH2, PIPE, OCC3, OHLC4, HKIN, HYPR, or TSMA.")
+        raise ValueError("DTHA mode must be RAW, OC0, OC2, LH2, PIPE, OCC3, OHLC4, HKIN, HYPR, or TSMA.")
 
     if df is None or df.empty:
         return df
@@ -103,6 +103,18 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Close"] = candle_close
         out["High"] = np.maximum(candle_open, candle_close)
         out["Low"] = np.minimum(candle_open, candle_close)
+        out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
+        return out
+
+    if mode == "OC0":
+        # Open = previous raw close (C1), Close = current raw close (C0).
+        # Preserve original High and Low. Seed first bar from raw Open.
+        previous_close = np.empty_like(raw_close)
+        previous_close[0] = raw_open[0]
+        previous_close[1:] = raw_close[:-1]
+        out["Open"] = previous_close
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
