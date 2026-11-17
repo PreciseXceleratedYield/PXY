@@ -90,18 +90,20 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Both sides held: suppress individual target exits with 99% target.
-        # Risk-bar and scheduled square-off remain independent.
-        if both_sides_open:
-            return EXETGTPXY_PRD_MAX_TARGET_PCT
-
-        # Single-side targets depend on OUT/SDIR agreement.
+        # Alignment is determined consistently by OUT and SDIR.
         out_direction = str(exit_signal or "").upper().strip()
         sdir_direction = str(tsma_state or "").upper().strip()
         aligned = (
             out_direction in ("BULL", "BEAR")
             and out_direction == sdir_direction
         )
+
+        # Both sides held: 99% when aligned, 14% otherwise.
+        # Risk-bar and scheduled square-off remain independent.
+        if both_sides_open:
+            return EXETGTPXY_PRD_MAX_TARGET_PCT if aligned else 14.0
+
+        # Single-side targets remain 28% aligned, 14% not aligned.
         return 28.0 if aligned else 14.0
 
     except Exception as e:
