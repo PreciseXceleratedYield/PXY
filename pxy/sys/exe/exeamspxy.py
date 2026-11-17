@@ -89,11 +89,13 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
     ce_capacity_ok = (
         ce_last_row is not None and ce_next_investment > 0
         and ce_worth > 0 and pe_worth > 0
+        and ce_worth < pe_worth  # Only the lower-worth side can layer
         and ce_worth + ce_next_investment <= pe_worth
     )
     pe_capacity_ok = (
         pe_last_row is not None and pe_next_investment > 0
         and pe_worth > 0 and ce_worth > 0
+        and pe_worth < ce_worth  # Only the lower-worth side can layer
         and pe_worth + pe_next_investment <= ce_worth
     )
     triggers = averaging_trigger_sides(
