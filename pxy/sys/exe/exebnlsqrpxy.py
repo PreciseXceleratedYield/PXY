@@ -68,6 +68,7 @@ def main():
             print(f"⚠️ Worth imbalance exceeds ±{MAX_VARIATION_PCT:g}%: warning only; no early square-off.")
             STATE_FILE.write_text(json.dumps({"date": today, "status": "warning", "variation_pct": variation}))
             return 0
+        print(f"Not prepared for CAS, i am exiting ⚖️ {variation:.2f}%")
         # Persist before submitting orders to prevent duplicate early square-off on subsequent cycles.
         STATE_FILE.write_text(json.dumps({"date": today, "status": "attempted", "variation_pct": variation}))
         from exesqrpxy import exit_all_positions
