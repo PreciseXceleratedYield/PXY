@@ -373,7 +373,7 @@ body{
 
 /* actions menu */
 .amenu-btn{
-    display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+    display:flex;flex-direction:row;align-items:center;gap:8px;
     padding:8px 10px;border-radius:7px;border:1px solid var(--border2);
     background:var(--item-bg);color:var(--text);font-family:'Syne',sans-serif;
     font-weight:700;font-size:11px;letter-spacing:0.03em;cursor:pointer;
@@ -381,10 +381,11 @@ body{
 }
 .amenu-btn:active{background:var(--item-bg-h);}
 .amenu-btn.sqrall{border-color:rgba(239,83,80,0.6);color:var(--sqr);background:rgba(239,83,80,0.12);}
-.amenu-btn.ce{border-color:rgba(38,166,154,0.3);color:var(--bull);}
-.amenu-btn.pe{border-color:rgba(239,83,80,0.3);color:var(--bear);}
+.amenu-btn.buy{border-color:rgba(38,166,154,0.45);color:var(--bull);background:rgba(38,166,154,0.07);}
+.amenu-btn.sqr{border-color:rgba(239,83,80,0.45);color:var(--bear);background:rgba(239,83,80,0.07);}
 .amenu-btn.config{border-color:rgba(59,130,246,0.3);color:var(--accent);}
-.amenu-btn.update{border-color:rgba(245,158,11,0.4);color:var(--gold);}
+.amenu-btn.restart{border-color:rgba(245,158,11,0.4);color:var(--gold);}
+.amenu-btn.update{border-color:rgba(59,130,246,0.35);color:var(--accent);}
 .amenu-sub{font-family:'DM Mono',monospace;font-size:8px;font-weight:400;opacity:0.65;letter-spacing:0.05em;}
 </style>
 </head>
@@ -597,13 +598,13 @@ body{
 <div id="actionsMenu" style="display:none;position:fixed;top:44px;left:0;z-index:9998;width:240px;background:var(--bg2);border:1px solid var(--border2);border-radius:0 0 12px 0;padding:10px 8px;flex-direction:column;gap:6px;box-shadow:0 2px 8px var(--shadow);">
     <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.08em;text-align:center;color:var(--text);padding:2px 0 6px;border-bottom:1px solid var(--border2);">PXY<sup style="color:var(--accent);">®</sup> ACTIONS</div>
     <button class="amenu-btn sqrall" data-script="pxysqrall">⛔ SQR ALL</button>
-    <button class="amenu-btn ce"     data-script="pxybuyce">✅ BUY CE</button>
-    <button class="amenu-btn ce"     data-script="pxysqrce">⛔ SQR CE</button>
-    <button class="amenu-btn pe"     data-script="pxybuype">✅ BUY PE</button>
-    <button class="amenu-btn pe"     data-script="pxysqrpe">⛔ SQR PE</button>
+    <button class="amenu-btn buy"    data-script="pxybuyce">➕ BUY CE</button>
+    <button class="amenu-btn sqr"    data-script="pxysqrce">✖ SQR CE</button>
+    <button class="amenu-btn buy"    data-script="pxybuype">➕ BUY PE</button>
+    <button class="amenu-btn sqr"    data-script="pxysqrpe">✖ SQR PE</button>
     <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG</button>
-    <button class="amenu-btn update" data-script="pxyrestart">🔄 PXYRESTART</button>
-    <button class="amenu-btn update" data-script="pxyupdate">🔄 PXYUPDATE</button>
+    <button class="amenu-btn restart" data-script="pxyrestart">🔁 PXYRESTART</button>
+    <button class="amenu-btn update" data-script="pxyupdate">⬇️ PXYUPDATE</button>
     <button id="amenuClose" style="margin-top:4px;padding:7px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;width:100%;">✕ Close</button>
 </div>
 
