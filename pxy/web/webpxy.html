@@ -605,8 +605,18 @@ body{
     <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG</button>
     <button class="amenu-btn restart" data-script="pxyrestart">🔁 PXYRESTART</button>
     <button class="amenu-btn update" data-script="pxyupdate">⬇️ PXYUPDATE</button>
+    <button type="button" class="amenu-btn config" id="auditOpen">📋 AUDIT</button>
     <button id="amenuClose" style="margin-top:4px;padding:7px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;width:100%;">✕ Close</button>
 </div>
+
+<dialog id="auditDialog" aria-labelledby="auditTitle" style="width:min(92vw,560px);max-height:85dvh;border:1px solid var(--border2);border-radius:12px;background:var(--bg2);color:var(--text);padding:18px">
+    <h2 id="auditTitle">Runtime Audit</h2>
+    <p>Read-only WebPXY snapshots</p>
+    <pre id="auditDetails" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+    <button type="button" class="amenu-btn" id="auditRefresh">Refresh</button>
+    <form method="dialog" style="display:inline"><button class="amenu-btn">Close</button></form>
+    <p><a href="https://pxy-logic-audit.pleasantgrant3.chatgpt.site" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Repository audit and validation checklist ↗</a></p>
+</dialog>
 
 <!-- PWD POPUP -->
 <div id="updPopup" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--overlay);align-items:center;justify-content:center;">
@@ -1947,6 +1957,60 @@ $('engineLogCopy').addEventListener('click',async()=>{
     catch(e){const range=document.createRange();range.selectNodeContents(log);window.getSelection().removeAllRanges();window.getSelection().addRange(range);$('engineLogStatus').textContent='Selected — press Ctrl+C';}
 });
 document.addEventListener('click',e=>{if(!amenu.contains(e.target)&&e.target!==logo)amenu.style.display='none';});
+async function refreshRuntimeAudit(){
+    const refresh = $('auditRefresh');
+    const details = $('auditDetails');
+    refresh.disabled = true;
+    details.textContent = 'Reading snapshots…';
+    const read = async name => {
+        try {
+            const response = await fetch('/api/web-data/' + name, {
+                cache: 'no-store', signal: AbortSignal.timeout(8000)
+            });
+            return response.ok ? await response.json() : null;
+        } catch {
+            return null;
+        }
+    };
+    const [positions, risk] = await Promise.all([read('webavgpxy'), read('webrinkopxy')]);
+    const number = (value, suffix = '') => Number.isFinite(value) ? value.toFixed(2) + suffix : 'Unverified';
+    const timestamp = value => {
+        const time = Date.parse(value);
+        return Number.isFinite(time)
+            ? new Date(time).toLocaleString('en-IN', {timeZone:'Asia/Kolkata'}) + ' IST'
+            : 'Unverified';
+    };
+    const now = Date.now();
+    const freshness = value => {
+        const age = now - Date.parse(value);
+        if (!Number.isFinite(age) || age < 0) return 'Unverified timestamp';
+        return Math.floor(age / 1000) + 's old' + (age > 60000 ? ' · Stale' : '');
+    };
+    const side = key => positions?.verified === true
+        ? key.toUpperCase() + ' · Lots ' + (positions[key + '_lots'] ?? '—')
+            + ' · Target ' + number(positions[key + '_tgt'], '%')
+            + ' · LGT ' + number(positions[key + '_lgt'], '%')
+        : key.toUpperCase() + ' · Unverified';
+    details.textContent = [
+        'POSITIONS · ' + timestamp(positions?.updated_at),
+        freshness(positions?.updated_at),
+        side('ce'), side('pe'), '',
+        'RISKBAR · ' + timestamp(risk?.updated_timestamp),
+        freshness(risk?.updated_timestamp),
+        'Cycle ' + (risk?.active_cycle_id ?? '—'),
+        'Cycle P&L ₹' + number(risk?.current_net_pnl),
+        'Target line ₹' + number(risk?.active_cycle_id != null ? risk.active_target_line : null), '',
+        'Engine revision and loaded settings: Unverified',
+        'Position and RiskBar snapshots refresh independently.'
+    ].join('\n');
+    refresh.disabled = false;
+}
+$('auditOpen').addEventListener('click',()=>{
+    amenu.style.display='none';
+    $('auditDialog').showModal();
+    refreshRuntimeAudit();
+});
+$('auditRefresh').addEventListener('click',refreshRuntimeAudit);
 document.querySelectorAll('.amenu-btn[data-script]').forEach(btn=>{
     btn.addEventListener('click',()=>{
         const script=btn.dataset.script;
