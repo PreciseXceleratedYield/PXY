@@ -90,9 +90,14 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Harvest-only target for every position, whether a single side or both sides.
-        # Risk-bar exits and scheduled square-off are handled independently.
-        return EXETGTPXY_PRD_MAX_TARGET_PCT
+        # Both sides held: individual targets remain at 99%.
+        if both_sides_open:
+            return EXETGTPXY_PRD_MAX_TARGET_PCT
+
+        # Single side: harvest at 99% when aligned with OUT;
+        # take 1.4% when OUT opposes the held side.
+        # Risk-bar and scheduled square-off remain independent.
+        return EXETGTPXY_PRD_MAX_TARGET_PCT if is_aligned else 1.4
 
     except Exception as e:
         _warn_once(
