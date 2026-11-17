@@ -189,9 +189,14 @@ def averaging_trigger_sides(
     max_investment,
     ce_next_investment=0.0,
     pe_next_investment=0.0,
+    avg_mode="LOSS",
+    ce_capacity_ok=False,
+    pe_capacity_ok=False,
 ):
     """Return CE/PE averaging decisions using the placement pipe's exact gates.
     """
+    if avg_mode not in {"LOSS", "CAPACITY"}:
+        raise ValueError(f"Invalid PXY_AVG_MODE: {avg_mode}")
     both_sides_open = ce_rows > 0 and pe_rows > 0
     ce_within_cap = ce_investment + ce_next_investment <= max_investment
     pe_within_cap = pe_investment + pe_next_investment <= max_investment
@@ -201,12 +206,12 @@ def averaging_trigger_sides(
             both_sides_open
             and not ce_cooling
             and ce_within_cap
-            and ce_loss <= ce_threshold
+            and (ce_loss <= ce_threshold if avg_mode == "LOSS" else ce_loss < 0 and ce_capacity_ok)
         ),
         "PE": bool(
             both_sides_open
             and not pe_cooling
             and pe_within_cap
-            and pe_loss <= pe_threshold
+            and (pe_loss <= pe_threshold if avg_mode == "LOSS" else pe_loss < 0 and pe_capacity_ok)
         ),
     }
