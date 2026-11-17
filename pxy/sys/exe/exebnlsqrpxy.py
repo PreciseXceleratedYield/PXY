@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""15:15 IST CE/PE worth balance check; exit both sides only when balanced."""
+"""15:15-15:20 IST CAS check; exit both sides when worth imbalance exceeds 15%."""
 import json
 import math
 import os
@@ -19,6 +19,7 @@ from execoolpxy import liquidation_pending
 from runexlckpxy import ledger_busy
 
 CHECK_START = dt_time(15, 15)
+CHECK_END = dt_time(15, 20)
 MAX_VARIATION_PCT = 15.0
 STATE_FILE = HERE / ".bnlsqrpxy_state.json"
 
@@ -46,7 +47,7 @@ def worths(active):
 
 def main():
     now = datetime.now(SYSCNFGPXY_TIMEZONE)
-    if not CHECK_START <= now.time() < SYSCNFGPXY_SQUAREOFF_START:
+    if not CHECK_START <= now.time() < CHECK_END:
         return 0
     today = now.date().isoformat()
     try:
@@ -64,18 +65,17 @@ def main():
         ce, pe = worths(data.get("active_orders"))
         variation = abs(ce - pe) / ((ce + pe) / 2.0) * 100.0
         print(f"⚖️ 15:15 CE worth ₹{ce:,.2f} | PE worth ₹{pe:,.2f} | variation {variation:.2f}%")
-        if variation > MAX_VARIATION_PCT:
-            print(f"⚠️ Worth imbalance exceeds ±{MAX_VARIATION_PCT:g}%: warning only; no early square-off.")
-            STATE_FILE.write_text(json.dumps({"date": today, "status": "warning", "variation_pct": variation}))
+        if variation <= MAX_VARIATION_PCT:
+            print(f"Prepared for CAS, not exiting ⚖️ {variation:.2f}%")
             return 0
-        print(f"Not prepared for CAS, i am exiting ⚖️ {variation:.2f}%")
+        print(f"Not prepared for CAS, I am exiting ⚖️ {variation:.2f}%")
         # Persist before submitting orders to prevent duplicate early square-off on subsequent cycles.
         STATE_FILE.write_text(json.dumps({"date": today, "status": "attempted", "variation_pct": variation}))
         from exesqrpxy import exit_all_positions
         accepted = exit_all_positions(
             "-all", return_accepted_keys=True, check_working_sells=True
         )
-        print(f"⚖️ Early balanced square-off accepted rows: {len(accepted or [])}; scheduled 15:30 protection remains.")
+        print(f"⚖️ CAS imbalance square-off accepted rows: {len(accepted or [])}; scheduled 15:30 protection remains.")
     except (ValueError, TypeError, KeyError, OSError) as error:
         print(f"⚠️ 15:15 balance check unavailable: {error}; no early square-off.")
     except Exception as error:
