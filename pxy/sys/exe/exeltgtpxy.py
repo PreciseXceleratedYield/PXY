@@ -90,8 +90,12 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Same OUT/SDIR target rule for single-side and dual-side positions.
+        # Both sides held: suppress individual target exits with 99% target.
         # Risk-bar and scheduled square-off remain independent.
+        if both_sides_open:
+            return EXETGTPXY_PRD_MAX_TARGET_PCT
+
+        # Single-side targets depend on OUT/SDIR agreement.
         out_direction = str(exit_signal or "").upper().strip()
         sdir_direction = str(tsma_state or "").upper().strip()
         aligned = (
