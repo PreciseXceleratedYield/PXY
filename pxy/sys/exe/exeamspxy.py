@@ -15,6 +15,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_ENTRY_CUTOFF,
     SYSCNFGPXY_TIMEZONE,
     EXEAMSPXY_MAX_INVESTMENT,
+    PXY_AVG_MODE,
     EXEAMSPXY_ORDER_AMO,
     EXEAMSPXY_ORDER_EXCHANGE_SEGMENT,
     EXEAMSPXY_ORDER_PRICE,
@@ -74,7 +75,31 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
         * max(0.0, safe_float(pe_last_row.get("sell_prc", 0.0)))
         if pe_last_row is not None else 0.0
     )
+    # Capacity uses current sell-price worth, not the historical purchase cost.
+    # Use the exact next order quantity/contract from the newest row.
+    def side_worth(rows):
+        return sum(
+            max(0.0, safe_float(row.get("qty", 0)))
+            * max(0.0, safe_float(row.get("sell_prc", 0)))
+            for _, row in rows.iterrows()
+        )
+
+    ce_worth = side_worth(ce_rows)
+    pe_worth = side_worth(pe_rows)
+    ce_capacity_ok = (
+        ce_last_row is not None and ce_next_investment > 0
+        and ce_worth > 0 and pe_worth > 0
+        and ce_worth + ce_next_investment <= pe_worth
+    )
+    pe_capacity_ok = (
+        pe_last_row is not None and pe_next_investment > 0
+        and pe_worth > 0 and ce_worth > 0
+        and pe_worth + pe_next_investment <= ce_worth
+    )
     triggers = averaging_trigger_sides(
+        avg_mode=PXY_AVG_MODE,
+        ce_capacity_ok=ce_capacity_ok,
+        pe_capacity_ok=pe_capacity_ok,
         ce_aligned=ce_aligned,
         pe_aligned=pe_aligned,
         ce_opposite_signal=ce_opposite_signal,
