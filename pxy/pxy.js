@@ -88,6 +88,43 @@ app.get('/engine-log', (req, res) => {
     res.type('html').send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PXY Engine Log</title><style>body{margin:0;background:#111;color:#eee;font:14px monospace}header{position:sticky;top:0;background:#222;padding:12px;display:flex;gap:12px;align-items:center}button{padding:8px 14px;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:14px;user-select:text}#status{margin-left:auto}</style></head><body><header><strong>PXY ENGINE LOG</strong><button id="copy">Copy text</button><button id="refresh">Refresh</button><label><input type="checkbox" id="auto" checked> Auto refresh</label><span id="status"></span></header><pre id="log">Loading...</pre><script>async function load(){try{const r=await fetch('/api/engine-log',{cache:'no-store'});const d=await r.json();document.getElementById('log').textContent=d.ok?d.log:(d.error||'Unavailable');document.getElementById('status').textContent=d.ok?'Live':'Unavailable';}catch(e){document.getElementById('status').textContent='Fetch failed';}}document.getElementById('refresh').onclick=load;document.getElementById('copy').onclick=async()=>{const t=document.getElementById('log').textContent;try{await navigator.clipboard.writeText(t);document.getElementById('status').textContent='Copied';}catch(e){const range=document.createRange();range.selectNodeContents(document.getElementById('log'));getSelection().removeAllRanges();getSelection().addRange(range);document.getElementById('status').textContent='Selected: press Ctrl+C';}};setInterval(()=>{if(document.getElementById('auto').checked&&!getSelection().toString())load();},3000);load();</script></body></html>`);
 });
 
+/* ========================= READ-ONLY RUNTIME AUDIT ========================= */
+app.get('/api/runtime-audit', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const fs = require('fs');
+    const configPath = path.join(__dirname, 'sys', 'syscnfgpxy.py');
+    let source;
+    try {
+        source = fs.readFileSync(configPath, 'utf8');
+    } catch {
+        return res.status(503).json({ok:false, error:'Configuration file unavailable', revision:null});
+    }
+    // Static source inspection only: never import Python modules or execute trading code.
+    const setting = key => {
+        const match = source.match(new RegExp('^\\s*' + key + '\\s*=\\s*([^#\\r\\n]+)', 'm'));
+        return match ? match[1].trim() : null;
+    };
+    const keys = [
+        'EXEOTMPXY_STRIKE_MODE', 'EXEOTMPXY_FIXED_DISTANCE',
+        'SYSDTHAPXY_CANDLE_MODE', 'SYSINPXY_SIGNAL_MODE', 'SYSOUTPXY_SIGNAL_MODE',
+        'SYSCNFGPXY_ENTRY_START', 'SYSCNFGPXY_ENTRY_CUTOFF',
+        'SYSCNFGPXY_SQUAREOFF_START', 'SYSCNFGPXY_TRADING_DAY_END',
+        'RUNEXACPXY_LATE_DAY_START', 'RUNEXACPXY_LATE_DAY_TARGET_PCT',
+        'EXETGTPXY_PRD_MAX_TARGET_PCT', 'RUNEXACPXY_TARGET_SQUAREOFF_ENABLED'
+    ];
+    const settings = Object.fromEntries(keys.map(key => [key, setting(key)]));
+    execFile('git', ['-C', __dirname, 'rev-parse', 'HEAD'], {timeout:2500}, (error, stdout) => {
+        res.json({
+            ok:true, checked_at:new Date().toISOString(),
+            revision:error ? null : stdout.trim(),
+            revision_scope:'WebPXY server checkout; engine process revision not independently verified',
+            settings_scope:'Configuration file on disk; running Python process values not independently verified',
+            settings,
+            execution:'Read-only: no Python import, order placement or engine mutation'
+        });
+    });
+});
+
 /* ========================= DASHBOARD DATA API ========================= */
 const WEB_DATA_FILES = new Set([
     'webactpxy', 'webavgpxy', 'webchrtpxy', 'webdashpxy', 'webdaypxy',
