@@ -98,10 +98,17 @@ def calculate_tgt(
             and out_direction == sdir_direction
         )
 
-        # Both sides held: 99% when aligned, 14% otherwise.
+        # Both sides held: BOTH OUT and SDIR must support this specific side.
+        # CE requires BULL/BULL; PE requires BEAR/BEAR.
         # Risk-bar and scheduled square-off remain independent.
         if both_sides_open:
-            return EXETGTPXY_PRD_MAX_TARGET_PCT if aligned else 14.0
+            side_direction = "BULL" if is_ce is True else "BEAR" if is_ce is False else None
+            side_aligned = (
+                side_direction is not None
+                and out_direction == side_direction
+                and sdir_direction == side_direction
+            )
+            return EXETGTPXY_PRD_MAX_TARGET_PCT if side_aligned else 14.0
 
         # Single-side targets remain 28% aligned, 14% not aligned.
         return 28.0 if aligned else 14.0
