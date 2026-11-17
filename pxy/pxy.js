@@ -105,21 +105,46 @@ app.get('/api/runtime-audit', (req, res) => {
         return match ? match[1].trim() : null;
     };
     const keys = [
-        'EXEOTMPXY_STRIKE_MODE', 'EXEOTMPXY_FIXED_DISTANCE',
+        'SYSCNFGPXY_TICKER', 'EXEOTMPXY_STRIKE_MODE', 'EXEOTMPXY_FIXED_DISTANCE',
         'SYSDTHAPXY_CANDLE_MODE', 'SYSINPXY_SIGNAL_MODE', 'SYSOUTPXY_SIGNAL_MODE',
-        'SYSCNFGPXY_ENTRY_START', 'SYSCNFGPXY_ENTRY_CUTOFF',
-        'SYSCNFGPXY_SQUAREOFF_START', 'SYSCNFGPXY_TRADING_DAY_END',
+        'SYSCNFGPXY_FRESH_ENTRY_START', 'SYSCNFGPXY_FRESH_ENTRY_END',
+        'SYSCNFGPXY_AVERAGING_CUTOFF', 'SYSCNFGPXY_NEW_BOOK_CUTOFF',
+        'SYSCNFGPXY_ENTRY_CUTOFF', 'SYSCNFGPXY_SQUAREOFF_START',
+        'SYSCNFGPXY_SQUAREOFF_ALL_START', 'SYSCNFGPXY_SQUAREOFF_END',
+        'SYSCNFGPXY_TRADING_DAY_END', 'RUNEXACPXY_TARGET_START',
         'RUNEXACPXY_LATE_DAY_START', 'RUNEXACPXY_LATE_DAY_TARGET_PCT',
+        'RUNEXACPXY_CYCLE_TARGET_PCT', 'RUNEXACPXY_STOP_SQUAREOFF_ENABLED',
         'EXETGTPXY_PRD_MAX_TARGET_PCT', 'RUNEXACPXY_TARGET_SQUAREOFF_ENABLED'
     ];
     const settings = Object.fromEntries(keys.map(key => [key, setting(key)]));
+    const expected = {
+        'NIFTY production': ['SYSCNFGPXY_TICKER', /NIFTY/],
+        'OTM FIX 150': ['EXEOTMPXY_FIXED_DISTANCE', /^150$/],
+        'Fresh entries start 09:17': ['SYSCNFGPXY_FRESH_ENTRY_START', /dt_time\\(9,\\s*17\\)/],
+        'Fresh entries end 15:00': ['SYSCNFGPXY_FRESH_ENTRY_END', /dt_time\\(15,\\s*0\\)/],
+        'Averaging cutoff 15:10': ['SYSCNFGPXY_AVERAGING_CUTOFF', /dt_time\\(15,\\s*10\\)/],
+        'Square-off starts 15:30': ['SYSCNFGPXY_SQUAREOFF_START', /dt_time\\(15,\\s*30\\)/]
+    };
+    const checks = Object.fromEntries(Object.entries(expected).map(([name, [key, pattern]]) =>
+        [name, {status: settings[key] == null ? 'UNVERIFIED' : pattern.test(settings[key]) ? 'PASS' : 'FAIL',
+                evidence: key + ' = ' + (settings[key] ?? 'missing'), scope:'disk configuration only'}]));
+    const targetSourcePath = path.join(__dirname, 'sys', 'exe', 'exeltgtpxy.py');
+    let targetSource = null;
+    try { targetSource = fs.readFileSync(targetSourcePath, 'utf8'); } catch {}
+    checks['Dual-side target source rule'] = {
+        status: targetSource == null ? 'UNVERIFIED' :
+            targetSource.includes('out_direction == side_direction') &&
+            targetSource.includes('sdir_direction == side_direction') ? 'PASS' : 'FAIL',
+        evidence:'sys/exe/exeltgtpxy.py calculate_tgt; static source check only',
+        scope:'source code, not running process'
+    };
     execFile('git', ['-C', __dirname, 'rev-parse', 'HEAD'], {timeout:2500}, (error, stdout) => {
         res.json({
             ok:true, checked_at:new Date().toISOString(),
             revision:error ? null : stdout.trim(),
             revision_scope:'WebPXY server checkout; engine process revision not independently verified',
             settings_scope:'Configuration file on disk; running Python process values not independently verified',
-            settings,
+            settings, checks,
             execution:'Read-only: no Python import, order placement or engine mutation'
         });
     });
