@@ -167,15 +167,12 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
             (raw_close + raw_high) / 2.0,
             (raw_close + raw_low) / 2.0,
         )
-        out["Open"] = raw_close
+        # Determine direction from raw Open/Close, then transform Close.
+        # Finally anchor the body at the raw Low (green) or High (red).
+        out["Open"] = np.where(bullish, raw_low, raw_high)
         out["Close"] = hyper_close
-        # HYPR-only trading candles: remove the lower wick on green candles
-        # and the upper wick on red candles. Keep the original conversion.
-        # Clamp the opposite extreme to enclose both body endpoints.
-        hyper_green = hyper_close > raw_close
-        hyper_red = hyper_close < raw_close
-        out["High"] = np.where(hyper_red, raw_close, np.maximum(raw_high, hyper_close))
-        out["Low"] = np.where(hyper_green, raw_close, np.minimum(raw_low, hyper_close))
+        out["High"] = raw_high
+        out["Low"] = raw_low
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
