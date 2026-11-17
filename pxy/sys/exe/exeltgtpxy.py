@@ -102,9 +102,6 @@ def calculate_tgt(
         # Both sides held: BOTH OUT and SDIR must support this specific side.
         # CE requires BULL/BULL; PE requires BEAR/BEAR.
         # Risk-bar and scheduled square-off remain independent.
-        if both_sides_open and PXY_AVG_MODE == "CAPACITY":
-            return 99.0
-
         if both_sides_open:
             side_direction = "BULL" if is_ce is True else "BEAR" if is_ce is False else None
             side_aligned = (
