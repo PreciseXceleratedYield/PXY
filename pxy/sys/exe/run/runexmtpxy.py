@@ -223,12 +223,12 @@ def cycle_risk_metrics(
     )
 
     # RiskBar uses the same 1.4% cycle profit target regardless of OUT signal.
-    # The minimum remains ₹100.
+    # Minimum cycle-profit harvest is ₹500.
     # All calculations use only active and closed rows of the present cycle.
     target_multiplier = 1.0
     target_pct = float(target_pct) * target_multiplier
     investment_target = premium_paid * target_pct / 100.0
-    minimum_pnl = 100.0
+    minimum_pnl = 500.0
     target = max(investment_target, minimum_pnl)
     target_reached = bool(
         target_multiplier > 0
