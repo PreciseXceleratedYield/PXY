@@ -649,7 +649,7 @@ RUNEXACPXY_TICK_MIN_GAP_SECONDS = 2
 # Runtime setting for ledger basis guard.
 RUNEXACPXY_LEDGER_BASIS_GUARD = True
 # Price, percentage or risk parameter for cycle target pct.
-RUNEXACPXY_CYCLE_TARGET_PCT = 2.8
+RUNEXACPXY_CYCLE_TARGET_PCT = 1.4
 if not 0 < RUNEXACPXY_CYCLE_TARGET_PCT <= 100:
     raise ValueError("RUNEXACPXY_CYCLE_TARGET_PCT must be between 0 and 100.")
 # Existing risk-ledger late-day override; kept separate from option exit targets.
