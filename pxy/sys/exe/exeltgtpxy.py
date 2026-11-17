@@ -90,9 +90,15 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Both sides held: individual targets remain at 99%.
+        # Both sides held: OUT and SDIR agreement determines the target.
         if both_sides_open:
-            return EXETGTPXY_PRD_MAX_TARGET_PCT
+            out_direction = str(exit_signal or "").upper().strip()
+            sdir_direction = str(tsma_state or "").upper().strip()
+            aligned = (
+                out_direction in ("BULL", "BEAR")
+                and out_direction == sdir_direction
+            )
+            return 28.0 if aligned else 14.0
 
         # Single side: harvest at 99% when aligned with OUT;
         # take 1.4% when OUT opposes the held side.
