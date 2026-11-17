@@ -117,6 +117,7 @@ def run_market_cycle():
     ENGINE_ITERATION += 1
     safe_run(RUN_DIR / "runnfutpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    safe_run(HERE / "exebnlsqrpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeentrpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     if AVERAGING_PIPE_ENABLED:
