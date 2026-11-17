@@ -90,56 +90,9 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Keep individual profit exits at 99% while both CE and PE are open.
-        # Risk-bar and scheduled square-off remain independent.
-        if both_sides_open:
-            return 99.0
-
-        # Preserve the existing late-day override for single-side positions.
-        if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
-            return EXETGTPXY_PRD_MAX_TARGET_PCT
-
-        def positive_factor(value):
-            try:
-                parsed = float(value)
-            except (TypeError, ValueError, OverflowError):
-                return 1.0
-
-            return (
-                parsed
-                if math.isfinite(parsed) and parsed > 0
-                else 1.0
-            )
-
-        own_depth = positive_factor(side_depth)
-        own_power = positive_factor(side_power)
-
-        # With only one active option side, use the higher of own power and own depth
-        # from 09:15 until 15:14. The late-day override remains authoritative.
-        if not both_sides_open and dt_time(9, 15) <= current_time < EXETGTPXY_PRD_LATE_DAY_TIME:
-            target_pct = (
-                max(X / (own_power + own_depth), X / 10.0)
-                if is_aligned
-                else X / 10.0
-            )
-            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
-
-        if not is_aligned:
-            # Both-side non-aligned target is fixed at 1.4%.
-            return 1.4
-
-        # When both CE and PE are open, aligned positions use the 99% target.
-        if both_sides_open:
-            return EXETGTPXY_PRD_MAX_TARGET_PCT
-
-        # Preserve the existing aligned fallback for other cases.
-        both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
-        target_pct = (
-            both_sides_base
-            + (both_sides_base / max(own_power, own_depth))
-        )
-
-        return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
+        # Harvest-only target for every position, whether a single side or both sides.
+        # Risk-bar exits and scheduled square-off are handled independently.
+        return EXETGTPXY_PRD_MAX_TARGET_PCT
 
     except Exception as e:
         _warn_once(
