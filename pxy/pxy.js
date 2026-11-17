@@ -117,17 +117,21 @@ app.get('/api/runtime-audit', (req, res) => {
         'EXETGTPXY_PRD_MAX_TARGET_PCT', 'RUNEXACPXY_TARGET_SQUAREOFF_ENABLED'
     ];
     const settings = Object.fromEntries(keys.map(key => [key, setting(key)]));
+    // Compare normalized Python configuration expressions, not fragile regexes.
+    const normalize = value => String(value ?? '').replace(/\\s+/g, '').replace(/["']/g, '');
     const expected = {
-        'NIFTY production': ['SYSCNFGPXY_TICKER', /NIFTY/],
-        'OTM FIX 150': ['EXEOTMPXY_FIXED_DISTANCE', /^150$/],
-        'Fresh entries start 09:17': ['SYSCNFGPXY_FRESH_ENTRY_START', /dt_time\\(9,\\s*17\\)/],
-        'Fresh entries end 15:00': ['SYSCNFGPXY_FRESH_ENTRY_END', /dt_time\\(15,\\s*0\\)/],
-        'Averaging cutoff 15:10': ['SYSCNFGPXY_AVERAGING_CUTOFF', /dt_time\\(15,\\s*10\\)/],
-        'Square-off starts 15:30': ['SYSCNFGPXY_SQUAREOFF_START', /dt_time\\(15,\\s*30\\)/]
+        'NIFTY index data source': ['SYSCNFGPXY_TICKER', ['^NSEI', 'NIFTY']],
+        'OTM FIX 150': ['EXEOTMPXY_FIXED_DISTANCE', ['150']],
+        'Fresh entries start 09:17': ['SYSCNFGPXY_FRESH_ENTRY_START', ['dt_time(9,17)']],
+        'Fresh entries end 15:00': ['SYSCNFGPXY_FRESH_ENTRY_END', ['dt_time(15,0)']],
+        'Averaging cutoff 15:10': ['SYSCNFGPXY_AVERAGING_CUTOFF', ['dt_time(15,10)']],
+        'Square-off starts 15:30': ['SYSCNFGPXY_SQUAREOFF_START', ['dt_time(15,30)']]
     };
-    const checks = Object.fromEntries(Object.entries(expected).map(([name, [key, pattern]]) =>
-        [name, {status: settings[key] == null ? 'UNVERIFIED' : pattern.test(settings[key]) ? 'PASS' : 'FAIL',
-                evidence: key + ' = ' + (settings[key] ?? 'missing'), scope:'disk configuration only'}]));
+    const checks = Object.fromEntries(Object.entries(expected).map(([name, [key, values]]) =>
+        [name, {status: settings[key] == null ? 'UNVERIFIED' :
+                    values.some(value => normalize(settings[key]) === normalize(value)) ? 'PASS' : 'FAIL',
+                evidence: key + ' = ' + (settings[key] ?? 'missing'),
+                scope:'disk configuration only'}]));
     const targetSourcePath = path.join(__dirname, 'sys', 'exe', 'exeltgtpxy.py');
     let targetSource = null;
     try { targetSource = fs.readFileSync(targetSourcePath, 'utf8'); } catch {}
