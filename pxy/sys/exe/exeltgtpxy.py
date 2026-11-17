@@ -21,6 +21,7 @@ from colorama import Fore, Style, init
 
 from syscnfgpxy import (
     EXETGTPXY_EXIT_KEY_COLUMN,
+    PXY_AVG_MODE,
     EXETGTPXY_PRD_BASE_FACTOR,
     EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT,
     EXETGTPXY_PRD_LATE_DAY_TIME,
@@ -101,6 +102,9 @@ def calculate_tgt(
         # Both sides held: BOTH OUT and SDIR must support this specific side.
         # CE requires BULL/BULL; PE requires BEAR/BEAR.
         # Risk-bar and scheduled square-off remain independent.
+        if both_sides_open and PXY_AVG_MODE == "CAPACITY":
+            return 99.0
+
         if both_sides_open:
             side_direction = "BULL" if is_ce is True else "BEAR" if is_ce is False else None
             side_aligned = (
