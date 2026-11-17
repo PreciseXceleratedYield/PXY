@@ -1972,7 +1972,7 @@ async function refreshRuntimeAudit(){
             return null;
         }
     };
-    const [positions, risk] = await Promise.all([read('webavgpxy'), read('webrinkopxy')]);
+    const [positions, risk, audit] = await Promise.all([read('webavgpxy'), read('webrinkopxy'), (async () => { try { const response = await fetch('/api/runtime-audit', {cache:'no-store', signal:AbortSignal.timeout(8000)}); return response.ok ? await response.json() : null; } catch { return null; } })()]);
     const number = (value, suffix = '') => Number.isFinite(value) ? value.toFixed(2) + suffix : 'Unverified';
     const timestamp = value => {
         const time = Date.parse(value);
@@ -2000,8 +2000,19 @@ async function refreshRuntimeAudit(){
         'Cycle ' + (risk?.active_cycle_id ?? '—'),
         'Cycle P&L ₹' + number(risk?.current_net_pnl),
         'Target line ₹' + number(risk?.active_cycle_id != null ? risk.active_target_line : null), '',
-        'Engine revision and loaded settings: Unverified',
-        'Position and RiskBar snapshots refresh independently.'
+        'CHECKOUT REVISION · ' + (audit?.revision ?? 'UNVERIFIED'),
+        'Engine process revision · UNVERIFIED (checkout is not process proof)',
+        'CONFIGURATION ON DISK (not verified as loaded in engine)',
+        ...(audit?.settings ? Object.entries(audit.settings).map(([key,value]) => key + ' = ' + (value ?? 'UNVERIFIED')) : ['UNVERIFIED · Runtime audit API unavailable']),
+        '',
+        'EFFECTIVE RULES · SOURCE-CODE EXPECTATIONS (not runtime verified)',
+        'Dual-side CE: 99% only when OUT=BULL and SDIR=BULL; otherwise 14%',
+        'Dual-side PE: 99% only when OUT=BEAR and SDIR=BEAR; otherwise 14%',
+        'Single-side: 28% when OUT and SDIR agree; otherwise 14%',
+        'LGT formula and RiskBar execution · UNVERIFIED',
+        'Entry, averaging and square-off execution · UNVERIFIED',
+        'Position and RiskBar snapshots refresh independently.',
+        'READ-ONLY · No orders or engine changes.'
     ].join('\n');
     refresh.disabled = false;
 }
