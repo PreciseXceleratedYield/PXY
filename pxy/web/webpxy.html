@@ -2005,6 +2005,11 @@ async function refreshRuntimeAudit(){
         'CONFIGURATION ON DISK (not verified as loaded in engine)',
         ...(audit?.settings ? Object.entries(audit.settings).map(([key,value]) => key + ' = ' + (value ?? 'UNVERIFIED')) : ['UNVERIFIED · Runtime audit API unavailable']),
         '',
+        'AUDIT CHECKS · DISK / SOURCE ONLY',
+        ...(audit?.checks ? Object.entries(audit.checks).map(([name,check]) =>
+            check.status + ' · ' + name + ' · ' + check.evidence
+        ) : ['UNVERIFIED · Audit checks unavailable; restart WebPXY backend']),
+        '',
         'EFFECTIVE RULES · SOURCE-CODE EXPECTATIONS (not runtime verified)',
         'Dual-side CE: 99% only when OUT=BULL and SDIR=BULL; otherwise 14%',
         'Dual-side PE: 99% only when OUT=BEAR and SDIR=BEAR; otherwise 14%',
