@@ -338,9 +338,9 @@ def check_counter_leg(remaining_df, sma_direction="NA", tsma_direction="NA"):
         # No signal-based offset.
         # No additional addition.
 
-        # CE counter-buy uses the full offset; PE counter-buy uses half.
-        # Round the adjusted offset to the nearest 50-point strike step.
-        adjusted_offset = float(offset) / 2 if action == "2" else float(offset)
+        # Both CE and PE counter-buys use the full calculated offset.
+        # Round to the nearest 50-point strike step.
+        adjusted_offset = float(offset)
         offset_step = RUNNIFTYPXY_STRIKE_STEP
         final_offset = int(
             ((adjusted_offset + offset_step / 2) // offset_step) * offset_step
