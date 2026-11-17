@@ -19,7 +19,7 @@ from execoolpxy import liquidation_pending
 from runexlckpxy import ledger_busy
 
 CHECK_START = dt_time(15, 15)
-MAX_VARIATION_PCT = 10.0
+MAX_VARIATION_PCT = 15.0
 STATE_FILE = HERE / ".bnlsqrpxy_state.json"
 
 
