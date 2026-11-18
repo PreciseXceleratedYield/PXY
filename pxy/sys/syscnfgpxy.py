@@ -166,7 +166,7 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 # DTHA transforms candles consumed by IN/OUT; STMT evaluates the selected candles independent of confirmation mode.
 # ================================================================
 # Switch or algorithm selection for candle mode.
-SYSDTHAPXY_CANDLE_MODE = "COC"
+SYSDTHAPXY_CANDLE_MODE = "TSMA"
 if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC0", "COC", "OC2", "LH2", "PIPE", "OCC3", "HKIN", "OHLC4", "HYPR", "TSMA"}:
     raise ValueError(
         "SYSDTHAPXY_CANDLE_MODE must be RAW, OC0, COC, OC2, LH2, PIPE, OCC3, HKIN, OHLC4, HYPR, or TSMA."
@@ -176,8 +176,8 @@ if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC0", "COC", "OC2", "LH2", "PIPE", "OC
 SYSINPXY_ORIGINAL_SIGNAL_MODE = "SUPR"
 SYSOUTPXY_ORIGINAL_SIGNAL_MODE = "SUPR"
 # DTHA signal mode uses the configured transformed candles for both channels.
-SYSINPXY_SIGNAL_MODE = "DTHA"
-SYSOUTPXY_SIGNAL_MODE = "DTHA"
+SYSINPXY_SIGNAL_MODE = "TSMAC1"
+SYSOUTPXY_SIGNAL_MODE = "TSMAC1"
 if SYSINPXY_SIGNAL_MODE not in {"DTHA", "OC2", "TSMAC0", "TSMAC1", "SUPR", "PIPE", "SDIR"}:
     raise ValueError("SYSINPXY_SIGNAL_MODE must be DTHA, OC2, TSMAC0, TSMAC1, SUPR, PIPE or SDIR.")
 if SYSOUTPXY_SIGNAL_MODE not in {"DTHA", "OC2", "TSMAC0", "TSMAC1", "SUPR", "PIPE", "SDIR"}:
