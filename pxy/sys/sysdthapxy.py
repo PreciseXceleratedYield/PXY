@@ -1,9 +1,12 @@
 # sysdthapxy.py
+from datetime import datetime, time as dt_time
+
 import numpy as np
 import pandas as pd
 
 from syscnfgpxy import (
     SYSDTHAPXY_CANDLE_MODE,
+    SYSCNFGPXY_TIMEZONE,
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
     SYSDPTPXY_LAST_N,
     SYSSMAPXY_TSMA_PERIOD,
@@ -31,8 +34,11 @@ def _dtha_ohlc_signature(df):
     return tuple(pd.util.hash_pandas_object(values, index=False).tolist())
 
 
-def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
-    """Transform raw market OHLC once using the configured pure candle mode."""
+def transform_dtha_ohlc(df, mode=None):
+    """Use RAW before 09:30 IST and configured TSMA thereafter; explicit modes bypass routing."""
+    if mode is None:
+        now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
+        mode = "RAW" if dt_time(9, 15) <= now < dt_time(9, 30) else SYSDTHAPXY_CANDLE_MODE
     valid_modes = {"RAW", "OC0", "COC", "OC2", "LH2", "PIPE", "OCC3", "OHLC4", "HKIN", "HYPR", "TSMA"}
     if mode not in valid_modes:
         raise ValueError("DTHA mode must be RAW, OC0, COC, OC2, LH2, PIPE, OCC3, OHLC4, HKIN, HYPR, or TSMA.")
