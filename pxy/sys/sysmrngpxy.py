@@ -1,11 +1,11 @@
 # sysmrngpxy.py
-"""Morning RAW0 direction from the shared DTHA candle stream."""
+"""Morning OC direction from the shared DTHA candle stream."""
 
 import pandas as pd
 
 
 def get_morning_direction(df=None):
-    """Compare the running DTHA close with its open (morning DTHA mode: RAW)."""
+    """Compare the running DTHA close with its open (morning DTHA mode: OC)."""
     from sysdtafpxy import fetch_yf_data
     from sysdthapxy import transform_dtha_ohlc
     if df is None:
