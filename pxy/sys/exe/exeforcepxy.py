@@ -30,6 +30,8 @@ from syscnfgpxy import (
     SYSCNFGPXY_TICKER,
     SYSCNFGPXY_TIMEZONE,
     PXY_AVG_MODE,
+    PXY_CAPACITY_MORNING_OTM_END,
+    PXY_CAPACITY_MORNING_OTM_DISTANCE,
 )
 from sysdcinpxy import exit_order_response_accepted
 from execoolpxy import liquidation_pending
@@ -155,9 +157,9 @@ def run_action(choice, offset_override=None, show_funds=True):
 
     # None preserves the configured strike policy.
     # An explicit integer overrides the configured distance.
-    # CAPACITY uses ATM for initial and counter-entry buys; LOSS retains configured strikes.
+    # CAPACITY uses OTMFIX 100 before 09:30 IST; ATM thereafter.
     if PXY_AVG_MODE == "CAPACITY":
-        offset_override = 0
+        offset_override = (PXY_CAPACITY_MORNING_OTM_DISTANCE if datetime.now(SYSCNFGPXY_TIMEZONE).time() < PXY_CAPACITY_MORNING_OTM_END else 0)
     symbol = get_symbol(ltp, sig, offset_override)
     res = {"stat": "SKIPPED"}
 
