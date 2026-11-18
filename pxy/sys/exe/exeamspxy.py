@@ -16,6 +16,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     EXEAMSPXY_MAX_INVESTMENT,
     PXY_AVG_MODE,
+    PXY_CAPACITY_MAX_LAYERS,
     EXEAMSPXY_ORDER_AMO,
     EXEAMSPXY_ORDER_EXCHANGE_SEGMENT,
     EXEAMSPXY_ORDER_PRICE,
@@ -87,13 +88,15 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
     ce_worth = side_worth(ce_rows)
     pe_worth = side_worth(pe_rows)
     ce_capacity_ok = (
-        ce_last_row is not None and ce_next_investment > 0
+        len(ce_rows) < PXY_CAPACITY_MAX_LAYERS
+        and ce_last_row is not None and ce_next_investment > 0
         and ce_worth > 0 and pe_worth > 0
         and ce_worth < pe_worth  # Only the lower-worth side can layer
         and ce_worth + ce_next_investment <= pe_worth
     )
     pe_capacity_ok = (
-        pe_last_row is not None and pe_next_investment > 0
+        len(pe_rows) < PXY_CAPACITY_MAX_LAYERS
+        and pe_last_row is not None and pe_next_investment > 0
         and pe_worth > 0 and ce_worth > 0
         and pe_worth < ce_worth  # Only the lower-worth side can layer
         and pe_worth + pe_next_investment <= ce_worth
