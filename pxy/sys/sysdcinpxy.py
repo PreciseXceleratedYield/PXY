@@ -206,12 +206,12 @@ def averaging_trigger_sides(
             both_sides_open
             and not ce_cooling
             and ce_within_cap
-            and (ce_loss <= ce_threshold if avg_mode == "LOSS" else ce_capacity_ok)
+            and (ce_loss <= ce_threshold if avg_mode == "LOSS" else (ce_capacity_ok and ce_aligned))
         ),
         "PE": bool(
             both_sides_open
             and not pe_cooling
             and pe_within_cap
-            and (pe_loss <= pe_threshold if avg_mode == "LOSS" else pe_capacity_ok)
+            and (pe_loss <= pe_threshold if avg_mode == "LOSS" else (pe_capacity_ok and pe_aligned))
         ),
     }
