@@ -167,9 +167,9 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 # ================================================================
 # Switch or algorithm selection for candle mode.
 SYSDTHAPXY_CANDLE_MODE = "TSMA"
-if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC0", "COC", "OC2", "LH2", "PIPE", "OCC3", "HKIN", "OHLC4", "HYPR", "TSMA"}:
+if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC", "OC0", "COC", "OC2", "LH2", "PIPE", "OCC3", "HKIN", "OHLC4", "HYPR", "TSMA"}:
     raise ValueError(
-        "SYSDTHAPXY_CANDLE_MODE must be RAW, OC0, COC, OC2, LH2, PIPE, OCC3, HKIN, OHLC4, HYPR, or TSMA."
+        "SYSDTHAPXY_CANDLE_MODE must be RAW, OC, OC0, COC, OC2, LH2, PIPE, OCC3, HKIN, OHLC4, HYPR, or TSMA."
     )
 
 # Original IN/OUT choices apply to all non-TSMA DTHA candle modes.
