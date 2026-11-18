@@ -396,7 +396,7 @@ EXEAGTPXY_ABS_CAP = 77.0
 EXEAGTPXY_FORCE_DEFAULT = 1.2
 
 # Limit or threshold governing max investment.
-PXY_AVG_MODE = "LOSS"  # LOSS (existing LGT) or CAPACITY (market-worth fit)
+PXY_AVG_MODE = "CAPACITY"  # LOSS (existing LGT) or CAPACITY (market-worth fit)
 PXY_CAPACITY_MAX_LAYERS = 3  # Base lot plus up to two averaging lots
 EXEAMSPXY_MAX_INVESTMENT = 25000.0
 # Limit or threshold governing max lgt loss.
