@@ -35,13 +35,13 @@ def _dtha_ohlc_signature(df):
 
 
 def transform_dtha_ohlc(df, mode=None):
-    """Use RAW before 09:30 IST and configured TSMA thereafter; explicit modes bypass routing."""
+    """Use OC before 09:30 IST and configured TSMA thereafter; explicit modes bypass routing."""
     if mode is None:
         now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
-        mode = "RAW" if dt_time(9, 15) <= now < dt_time(9, 30) else SYSDTHAPXY_CANDLE_MODE
-    valid_modes = {"RAW", "OC0", "COC", "OC2", "LH2", "PIPE", "OCC3", "OHLC4", "HKIN", "HYPR", "TSMA"}
+        mode = "OC" if dt_time(9, 15) <= now < dt_time(9, 30) else SYSDTHAPXY_CANDLE_MODE
+    valid_modes = {"RAW", "OC", "OC0", "COC", "OC2", "LH2", "PIPE", "OCC3", "OHLC4", "HKIN", "HYPR", "TSMA"}
     if mode not in valid_modes:
-        raise ValueError("DTHA mode must be RAW, OC0, COC, OC2, LH2, PIPE, OCC3, OHLC4, HKIN, HYPR, or TSMA.")
+        raise ValueError("DTHA mode must be RAW, OC, OC0, COC, OC2, LH2, PIPE, OCC3, OHLC4, HKIN, HYPR, or TSMA.")
 
     if df is None or df.empty:
         return df
@@ -109,6 +109,22 @@ def transform_dtha_ohlc(df, mode=None):
         out["Close"] = candle_close
         out["High"] = np.maximum(candle_open, candle_close)
         out["Low"] = np.minimum(candle_open, candle_close)
+        out.attrs["pxy_dtha_mode"] = mode
+        out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
+        out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
+        return out
+
+    if mode == "OC":
+        # C1 = previous raw candle close; C0 = current (running) raw close.
+        # Seed the first candle with its own raw open.
+        previous_close = np.empty_like(raw_close)
+        previous_close[0] = raw_open[0]
+        previous_close[1:] = raw_close[:-1]
+        out["Open"] = previous_close
+        out["Close"] = raw_close
+        # Previous close may be outside the current raw candle range after a gap.
+        out["High"] = np.maximum(raw_high, np.maximum(previous_close, raw_close))
+        out["Low"] = np.minimum(raw_low, np.minimum(previous_close, raw_close))
         out.attrs["pxy_dtha_mode"] = mode
         out.attrs["pxy_dtha_signature"] = _dtha_ohlc_signature(out)
         out.attrs["pxy_dtha_rows"] = dict(zip(map(_dtha_row_key, out.index), out.attrs["pxy_dtha_signature"]))
