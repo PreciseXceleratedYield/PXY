@@ -29,6 +29,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_ENTRY_CUTOFF,
     SYSCNFGPXY_TICKER,
     SYSCNFGPXY_TIMEZONE,
+    PXY_AVG_MODE,
 )
 from sysdcinpxy import exit_order_response_accepted
 from execoolpxy import liquidation_pending
@@ -154,6 +155,9 @@ def run_action(choice, offset_override=None, show_funds=True):
 
     # None preserves the configured strike policy.
     # An explicit integer overrides the configured distance.
+    # CAPACITY uses ATM for initial and counter-entry buys; LOSS retains configured strikes.
+    if PXY_AVG_MODE == "CAPACITY":
+        offset_override = 0
     symbol = get_symbol(ltp, sig, offset_override)
     res = {"stat": "SKIPPED"}
 
