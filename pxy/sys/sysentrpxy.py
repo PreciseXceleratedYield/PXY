@@ -50,11 +50,11 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     else:
         now_time = now
 
-    # Morning RAW0 uses the current raw DTAF candle (Close versus Open), independent of DTHA.
+    # Morning RAW0 uses the shared DTHA candle stream (RAW until 09:30).
     # Master liquidation, cooldown, and entry-time restrictions still take precedence.
     if MORNING_OVERRIDE_START <= now_time < MORNING_OVERRIDE_END:
         try:
-            _, direction = get_morning_direction()
+            _, direction = get_morning_direction(df=df)
             direction = str(direction).upper().strip()
             entry_sig = {"UP": "BUY", "DOWN": "SELL"}.get(direction, "NONE")
             exit_sig = {"UP": "BULL", "DOWN": "BEAR"}.get(direction, "NONE")
