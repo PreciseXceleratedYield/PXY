@@ -17,6 +17,7 @@ from syscnfgpxy import (
     EXEAMSPXY_MAX_INVESTMENT,
     PXY_AVG_MODE,
     PXY_CAPACITY_MAX_LAYERS,
+    SYSCNFGPXY_NIFTY_LOT_SIZE,
     EXEAMSPXY_ORDER_AMO,
     EXEAMSPXY_ORDER_EXCHANGE_SEGMENT,
     EXEAMSPXY_ORDER_PRICE,
@@ -76,58 +77,62 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
         * max(0.0, safe_float(pe_last_row.get("sell_prc", 0.0)))
         if pe_last_row is not None else 0.0
     )
-    # Capacity uses current sell-price worth, not the historical purchase cost.
-    # Use the exact next order quantity/contract from the newest row.
-    def side_worth(rows):
-        return sum(
-            max(0.0, safe_float(row.get("qty", 0)))
-            * max(0.0, safe_float(row.get("sell_prc", 0)))
-            for _, row in rows.iterrows()
-        )
-
-    ce_worth = side_worth(ce_rows)
-    pe_worth = side_worth(pe_rows)
-    # Count actual open NIFTY lots, not dataframe rows: broker positions may
-    # consolidate several fills into one row. Reject malformed/partial lots.
-    from syscnfgpxy import SYSCNFGPXY_NIFTY_LOT_SIZE
-
-    def capacity_lots(rows):
-        lot_size = SYSCNFGPXY_NIFTY_LOT_SIZE
-        if not isinstance(lot_size, int) or isinstance(lot_size, bool) or lot_size <= 0:
-            return None
-        total_qty = 0
-        for _, row in rows.iterrows():
-            qty = safe_float(row.get("qty", 0))
-            if not (qty > 0 and qty.is_integer()):
+    ce_capacity_ok = pe_capacity_ok = False
+    if PXY_AVG_MODE == "CAPACITY":
+        # Strategy-specific calculations; DEFAULT/LOSS remains unchanged.
+        ce_next_investment = SYSCNFGPXY_NIFTY_LOT_SIZE * max(0.0, safe_float(ce_last_row.get("sell_prc", 0))) if ce_last_row is not None else 0.0
+        pe_next_investment = SYSCNFGPXY_NIFTY_LOT_SIZE * max(0.0, safe_float(pe_last_row.get("sell_prc", 0))) if pe_last_row is not None else 0.0
+        # Capacity uses current sell-price worth, not the historical purchase cost.
+        # CAPACITY always proposes one NIFTY lot.
+        def side_worth(rows):
+            return sum(
+                max(0.0, safe_float(row.get("qty", 0)))
+                * max(0.0, safe_float(row.get("sell_prc", 0)))
+                for _, row in rows.iterrows()
+            )
+    
+        ce_worth = side_worth(ce_rows)
+        pe_worth = side_worth(pe_rows)
+        # Count actual open NIFTY lots, not dataframe rows: broker positions may
+        # consolidate several fills into one row. Reject malformed/partial lots.
+        
+        def capacity_lots(rows):
+            lot_size = SYSCNFGPXY_NIFTY_LOT_SIZE
+            if not isinstance(lot_size, int) or isinstance(lot_size, bool) or lot_size <= 0:
                 return None
-            total_qty += int(qty)
-        if total_qty % lot_size:
-            return None
-        return total_qty // lot_size
-
-    ce_open_lots = capacity_lots(ce_rows)
-    pe_open_lots = capacity_lots(pe_rows)
-    ce_order_qty = abs(int(safe_float(ce_last_row.get("qty", 0)))) if ce_last_row is not None else 0
-    pe_order_qty = abs(int(safe_float(pe_last_row.get("qty", 0)))) if pe_last_row is not None else 0
-    ce_next_lots = ce_order_qty // SYSCNFGPXY_NIFTY_LOT_SIZE if SYSCNFGPXY_NIFTY_LOT_SIZE > 0 and ce_order_qty % SYSCNFGPXY_NIFTY_LOT_SIZE == 0 else None
-    pe_next_lots = pe_order_qty // SYSCNFGPXY_NIFTY_LOT_SIZE if SYSCNFGPXY_NIFTY_LOT_SIZE > 0 and pe_order_qty % SYSCNFGPXY_NIFTY_LOT_SIZE == 0 else None
-    ce_capacity_ok = (
-        ce_open_lots is not None and ce_next_lots is not None and ce_next_lots > 0
-        and ce_open_lots + ce_next_lots <= PXY_CAPACITY_MAX_LAYERS
-        and ce_last_row is not None and ce_next_investment > 0
-        and ce_worth > 0 and pe_worth > 0
-        and ce_worth < pe_worth
-        and ce_worth + ce_next_investment <= pe_worth
-    )
-    pe_capacity_ok = (
-        pe_open_lots is not None and pe_next_lots is not None and pe_next_lots > 0
-        and pe_open_lots + pe_next_lots <= PXY_CAPACITY_MAX_LAYERS
-        and pe_last_row is not None and pe_next_investment > 0
-        and pe_worth > 0 and ce_worth > 0
-        and pe_worth < ce_worth
-        and pe_worth + pe_next_investment <= ce_worth
-    )
-    triggers = averaging_trigger_sides(
+            total_qty = 0
+            for _, row in rows.iterrows():
+                qty = safe_float(row.get("qty", 0))
+                if not (qty > 0 and qty.is_integer()):
+                    return None
+                total_qty += int(qty)
+            if total_qty % lot_size:
+                return None
+            return total_qty // lot_size
+    
+        ce_open_lots = capacity_lots(ce_rows)
+        pe_open_lots = capacity_lots(pe_rows)
+        ce_order_qty = abs(int(safe_float(ce_last_row.get("qty", 0)))) if ce_last_row is not None else 0
+        pe_order_qty = abs(int(safe_float(pe_last_row.get("qty", 0)))) if pe_last_row is not None else 0
+        ce_next_lots = ce_order_qty // SYSCNFGPXY_NIFTY_LOT_SIZE if SYSCNFGPXY_NIFTY_LOT_SIZE > 0 and ce_order_qty % SYSCNFGPXY_NIFTY_LOT_SIZE == 0 else None
+        pe_next_lots = pe_order_qty // SYSCNFGPXY_NIFTY_LOT_SIZE if SYSCNFGPXY_NIFTY_LOT_SIZE > 0 and pe_order_qty % SYSCNFGPXY_NIFTY_LOT_SIZE == 0 else None
+        ce_capacity_ok = (
+            ce_open_lots is not None and True
+            and ce_open_lots + 1 <= PXY_CAPACITY_MAX_LAYERS
+            and ce_last_row is not None and ce_next_investment > 0
+            and ce_worth > 0 and pe_worth > 0
+            and ce_worth < pe_worth
+            and ce_worth + ce_next_investment <= pe_worth
+        )
+        pe_capacity_ok = (
+            pe_open_lots is not None and True
+            and pe_open_lots + 1 <= PXY_CAPACITY_MAX_LAYERS
+            and pe_last_row is not None and pe_next_investment > 0
+            and pe_worth > 0 and ce_worth > 0
+            and pe_worth < ce_worth
+            and pe_worth + pe_next_investment <= ce_worth
+        )
+        triggers = averaging_trigger_sides(
         avg_mode=PXY_AVG_MODE,
         ce_capacity_ok=ce_capacity_ok,
         pe_capacity_ok=pe_capacity_ok,
@@ -162,7 +167,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
         )
     if triggers["CE"]:
         ce_symbol = ce_last_row['symbol']
-        ce_qty = abs(int(safe_float(ce_last_row.get('qty', 0.0))))
+        ce_qty = SYSCNFGPXY_NIFTY_LOT_SIZE if PXY_AVG_MODE == "CAPACITY" else abs(int(safe_float(ce_last_row.get('qty', 0.0))))
 
         logger.info(f"⚖️ CE TRIGGERED: Metric Value ({ce_lgt_val}%) <= Threshold ({ce_dynamic_threshold}%).")
         try:
@@ -205,7 +210,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
         )
     if triggers["PE"]:
         pe_symbol = pe_last_row['symbol']
-        pe_qty = abs(int(safe_float(pe_last_row.get('qty', 0.0))))
+        pe_qty = SYSCNFGPXY_NIFTY_LOT_SIZE if PXY_AVG_MODE == "CAPACITY" else abs(int(safe_float(pe_last_row.get('qty', 0.0))))
 
         logger.info(f"⚖️ PE TRIGGERED: Metric Value ({pe_lgt_val}%) <= Threshold ({pe_dynamic_threshold}%).")
         try:
