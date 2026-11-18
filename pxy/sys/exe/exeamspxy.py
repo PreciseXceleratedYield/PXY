@@ -87,18 +87,44 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
 
     ce_worth = side_worth(ce_rows)
     pe_worth = side_worth(pe_rows)
+    # Count actual open NIFTY lots, not dataframe rows: broker positions may
+    # consolidate several fills into one row. Reject malformed/partial lots.
+    from syscnfgpxy import SYSCNFGPXY_NIFTY_LOT_SIZE
+
+    def capacity_lots(rows):
+        lot_size = SYSCNFGPXY_NIFTY_LOT_SIZE
+        if not isinstance(lot_size, int) or isinstance(lot_size, bool) or lot_size <= 0:
+            return None
+        total_qty = 0
+        for _, row in rows.iterrows():
+            qty = safe_float(row.get("qty", 0))
+            if not (qty > 0 and qty.is_integer()):
+                return None
+            total_qty += int(qty)
+        if total_qty % lot_size:
+            return None
+        return total_qty // lot_size
+
+    ce_open_lots = capacity_lots(ce_rows)
+    pe_open_lots = capacity_lots(pe_rows)
+    ce_order_qty = abs(int(safe_float(ce_last_row.get("qty", 0)))) if ce_last_row is not None else 0
+    pe_order_qty = abs(int(safe_float(pe_last_row.get("qty", 0)))) if pe_last_row is not None else 0
+    ce_next_lots = ce_order_qty // SYSCNFGPXY_NIFTY_LOT_SIZE if SYSCNFGPXY_NIFTY_LOT_SIZE > 0 and ce_order_qty % SYSCNFGPXY_NIFTY_LOT_SIZE == 0 else None
+    pe_next_lots = pe_order_qty // SYSCNFGPXY_NIFTY_LOT_SIZE if SYSCNFGPXY_NIFTY_LOT_SIZE > 0 and pe_order_qty % SYSCNFGPXY_NIFTY_LOT_SIZE == 0 else None
     ce_capacity_ok = (
-        len(ce_rows) < PXY_CAPACITY_MAX_LAYERS
+        ce_open_lots is not None and ce_next_lots is not None and ce_next_lots > 0
+        and ce_open_lots + ce_next_lots <= PXY_CAPACITY_MAX_LAYERS
         and ce_last_row is not None and ce_next_investment > 0
         and ce_worth > 0 and pe_worth > 0
-        and ce_worth < pe_worth  # Only the lower-worth side can layer
+        and ce_worth < pe_worth
         and ce_worth + ce_next_investment <= pe_worth
     )
     pe_capacity_ok = (
-        len(pe_rows) < PXY_CAPACITY_MAX_LAYERS
+        pe_open_lots is not None and pe_next_lots is not None and pe_next_lots > 0
+        and pe_open_lots + pe_next_lots <= PXY_CAPACITY_MAX_LAYERS
         and pe_last_row is not None and pe_next_investment > 0
         and pe_worth > 0 and ce_worth > 0
-        and pe_worth < ce_worth  # Only the lower-worth side can layer
+        and pe_worth < ce_worth
         and pe_worth + pe_next_investment <= ce_worth
     )
     triggers = averaging_trigger_sides(
