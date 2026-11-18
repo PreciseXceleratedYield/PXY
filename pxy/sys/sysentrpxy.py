@@ -20,7 +20,7 @@ from execoolpxy import cooldown_remaining, liquidation_pending
 ENTRY_START = SYSCNFGPXY_FRESH_ENTRY_START
 ENTRY_END = SYSCNFGPXY_FRESH_ENTRY_END
 MORNING_OVERRIDE_START = dt_time(9, 15)
-MORNING_OVERRIDE_END = dt_time(15, 40)
+MORNING_OVERRIDE_END = dt_time(9, 30)
 
 
 def _apply_new_cycle_cutoff(entry_signal, exit_signal, now_time):
@@ -50,7 +50,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     else:
         now_time = now
 
-    # Raw-close direction override uses MRNG's raw DTAF candles, independent of DTHA.
+    # Morning RAW0 uses the current raw DTAF candle (Close versus Open), independent of DTHA.
     # Master liquidation, cooldown, and entry-time restrictions still take precedence.
     if MORNING_OVERRIDE_START <= now_time < MORNING_OVERRIDE_END:
         try:
