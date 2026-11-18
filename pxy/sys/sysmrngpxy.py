@@ -1,11 +1,11 @@
 # sysmrngpxy.py
-"""Morning COC direction from raw DTAF candles."""
+"""Morning RAW0 direction from the current raw DTAF candle."""
 
 import pandas as pd
 
 
 def get_morning_direction():
-    """Compare running close with mean(previous close, current open)."""
+    """Compare running raw close with current raw open (RAW0)."""
     from sysdtafpxy import fetch_yf_data
     df = fetch_yf_data()
     required = {"Open", "High", "Low", "Close"}
@@ -16,9 +16,8 @@ def get_morning_direction():
     if raw.iloc[-2:].isna().any().any():
         return None, "NONE"
 
-    previous_close = raw["Close"].iloc[-2]
     current_close = raw["Close"].iloc[-1]
     current_open = raw["Open"].iloc[-1]
-    reference = (previous_close + current_open) / 2.0
+    reference = current_open
     direction = "UP" if current_close > reference else "DOWN" if current_close < reference else "NONE"
     return current_close, direction
