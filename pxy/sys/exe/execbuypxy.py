@@ -22,6 +22,7 @@ from colorama import Fore, Style
 
 from syscnfgpxy import (
     EXECBUYPXY_ACTION,
+    PXY_AVG_MODE,
     EXECBUYPXY_CUTOFF,
     EXECBUYPXY_DEBUG_ENABLED,
     EXECBUYPXY_LOCK_KEEP_SECS,
@@ -245,7 +246,9 @@ def check_counter_leg(remaining_df, sma_direction="NA", tsma_direction="NA"):
 
         # ---------------- strike selection ----------------
 
-        if EXECBUYPXY_USE_DYNAMIC_STRIKE:
+        if PXY_AVG_MODE == "CAPACITY":
+            offset = 0  # Re-enter ATM; never inherit the held leg's strike distance.
+        elif EXECBUYPXY_USE_DYNAMIC_STRIKE:
 
             offset = _counter_buy_offset(remaining_df, sma_direction)
 
