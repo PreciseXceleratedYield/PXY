@@ -167,9 +167,9 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 # ================================================================
 # Switch or algorithm selection for candle mode.
 SYSDTHAPXY_CANDLE_MODE = "TSMA"
-if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC0", "COC", "OC2", "LH2", "PIPE", "OCC3", "HKIN", "OHLC4", "HYPR", "TSMA"}:
+if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC", "OC0", "COC", "OC2", "LH2", "PIPE", "OCC3", "HKIN", "OHLC4", "HYPR", "TSMA"}:
     raise ValueError(
-        "SYSDTHAPXY_CANDLE_MODE must be RAW, OC0, COC, OC2, LH2, PIPE, OCC3, HKIN, OHLC4, HYPR, or TSMA."
+        "SYSDTHAPXY_CANDLE_MODE must be RAW, OC, OC0, COC, OC2, LH2, PIPE, OCC3, HKIN, OHLC4, HYPR, or TSMA."
     )
 
 # Original IN/OUT choices apply to all non-TSMA DTHA candle modes.
@@ -396,7 +396,7 @@ EXEAGTPXY_ABS_CAP = 77.0
 EXEAGTPXY_FORCE_DEFAULT = 1.2
 
 # Limit or threshold governing max investment.
-PXY_AVG_MODE = "LOSS"  # LOSS (existing LGT) or CAPACITY (market-worth fit)
+PXY_AVG_MODE = "CAPACITY"  # LOSS (existing LGT) or CAPACITY (market-worth fit)
 PXY_CAPACITY_MAX_LAYERS = 3  # Base lot plus up to two averaging lots
 EXEAMSPXY_MAX_INVESTMENT = 25000.0
 # Limit or threshold governing max lgt loss.
